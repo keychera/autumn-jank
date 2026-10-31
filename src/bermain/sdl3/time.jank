@@ -1,0 +1,33 @@
+(ns bermain.sdl3.time
+  (:include
+   "SDL3/SDL.h")
+  (:require
+   [bermain.engine.world :as world]
+   [odoyle.rules :as o]))
+
+(defn flow [{:keys [::one-second ::frame-count] :as game}]
+  (let [total (/ (cpp/SDL_GetTicks) 1000.0)
+        delta (- total (::total game 0))
+        game' (-> (assoc game ::total total ::delta delta)
+                  (world/new-fact ::now {::total total ::delta delta}))]
+    (if (< one-second 1)
+      (-> game'
+          (assoc ::one-second (+ one-second delta) ::frame-count (inc frame-count)))
+      (-> game'
+          (assoc ::one-second 0 ::frame-count 0)
+          (world/new-fact ::now {::debug-fps frame-count})))))
+
+(def rules
+  (o/ruleset
+   {::now
+    [:what
+     [::now ::total tt]
+     [::now ::delta dt]]
+
+    ::debug-fps
+    [:what [::now ::debug-fps debug-fps]]}))
+
+(defn init [game]
+  (-> game
+      (assoc ::one-second 0 ::frame-count 0)
+      (world/establish rules)))

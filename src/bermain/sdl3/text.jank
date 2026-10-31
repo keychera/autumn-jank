@@ -1,0 +1,40 @@
+(ns bermain.sdl3.text
+  (:include
+   "cmath"
+   "SDL3_ttf/SDL_ttf.h")
+  (:require
+   [bermain.engine.world :as world]
+   [bermain.sdl3.error :refer [must-be-some must-be-true]]
+   [bermain.sdl3.time :as time]))
+
+;; resource
+;; https://github.com/libsdl-org/SDL_ttf/blob/main/examples/showfps.c
+
+(defn init [game]
+  (must-be-true (cpp/TTF_Init))
+
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))
+        engine   (must-be-some (cpp/TTF_CreateRendererTextEngine renderer))
+        font     (must-be-some (cpp/TTF_OpenFont "res/fonts/CardboardCrown/CardboardCrown.ttf" 32))
+        text     (must-be-some (cpp/TTF_CreateText engine font "empty" 0))]
+    (assoc game
+           ::engine (cpp/box engine)
+           ::font   (cpp/box font)
+           ::text   (cpp/box text))))
+
+(defn render! [game]
+  (let [text (cpp/unbox (:* cpp/TTF_Text) (::text game))
+        {:keys [debug-fps]} (world/ask-one game ::time/debug-fps)]
+    (when (seq (:bermain.sdl3.sdl3-input/pressed? game))
+      (tap> (:bermain.sdl3.sdl3-input/pressed? game)))
+    (doto text
+      (cpp/TTF_SetTextColor 255 255 255 cpp/SDL_ALPHA_OPAQUE)
+      (cpp/TTF_SetTextString (str debug-fps) 0)
+      (cpp/TTF_DrawRendererText 16.0 10.0))
+    :done))
+
+(defn clean! [{:keys [::text ::engine ::font]}]
+  (when text (cpp/TTF_DestroyText (cpp/unbox (:* cpp/TTF_Text) text)))
+  (when engine (cpp/TTF_DestroyRendererTextEngine (cpp/unbox (:* cpp/TTF_TextEngine) engine)))
+  (when font (cpp/TTF_CloseFont (cpp/unbox (:* cpp/TTF_Font) font)))
+  (cpp/TTF_Quit))

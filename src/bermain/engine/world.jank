@@ -1,0 +1,33 @@
+(ns bermain.engine.world
+  (:require
+   [bermain.engine.utils :as utils]
+   [odoyle.rules :as o]))
+
+;; api
+(defn establish
+  ([game rules] (establish game rules nil))
+  ([game rules init-fn]
+   (cond-> game
+     true (update ::rules (fnil into []) rules)
+     init-fn (update ::init-fns (fnil conj []) init-fn))))
+
+(defn new-fact [game esse-id attr->val]
+  (update game ::this o/insert esse-id attr->val))
+
+(defn ask-one [game rule-name]
+  (utils/query-one (::this game) rule-name))
+
+(defn esse
+  "insert an esse given the facts in the shape of maps of attr->value.
+   this fn is merely sugar, spice, and everything nice"
+  [world esse-id facts]
+  (o/insert world esse-id facts))
+
+;; engine
+(defn init [{:keys [::rules ::init-fns] :as game}]
+  (let [world  (reduce o/add-rule (o/->session) rules)
+        world' (reduce (fn [w' init-fn] (or (init-fn w' game) w')) world init-fns)]
+    (assoc game ::this world')))
+
+(defn tick [game]
+  (update game ::this o/fire-rules))

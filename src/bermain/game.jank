@@ -1,0 +1,58 @@
+(ns bermain.game
+  (:include
+   "SDL3/SDL.h"
+   "SDL3_image/SDL_image.h")
+  (:require
+   [bermain.engine :as engine]
+   [bermain.sdl3.error :as error :refer [must-be-some must-be-true]]))
+
+(declare clean!)
+
+(defn -main
+  ([] (-main {}))
+  ([{:keys [stop-atom]}]
+   (must-be-true (cpp/SDL_Init (bit-or cpp/SDL_INIT_VIDEO cpp/SDL_INIT_GAMEPAD)))
+
+   (let [main-scale   (cpp/SDL_GetDisplayContentScale (cpp/SDL_GetPrimaryDisplay))
+         window-flags (bit-or cpp/SDL_WINDOW_RESIZABLE cpp/SDL_WINDOW_HIDDEN cpp/SDL_WINDOW_HIGH_PIXEL_DENSITY)
+         width        (int (* 640 main-scale))
+         height       (int (* 360 main-scale))
+         game         {}
+         sdl-window   (must-be-some
+                       (cpp/SDL_CreateWindow "Hello again jank + sdl3!" width height window-flags)
+                       #_or (clean! game))
+         _            (reset! error/sdl-window* (cpp/box sdl-window))
+         game         (assoc game :sdl-window (cpp/box sdl-window))
+         sdl-renderer (must-be-some
+                       (cpp/SDL_CreateRenderer sdl-window cpp/nullptr)
+                       #_or (clean! game))
+         numkeys      (cpp/int)
+         kb-state     (cpp/SDL_GetKeyboardState (cpp/& numkeys))
+         game         (assoc game
+                             :sdl-renderer (cpp/box sdl-renderer)
+                             :kb-state     (cpp/box kb-state))]
+     (cpp/SDL_SetWindowPosition sdl-window 1500 900)
+     (cpp/SDL_SetWindowAlwaysOnTop sdl-window true)
+     (cpp/SDL_ShowWindow sdl-window)
+     (cpp/SDL_SetRenderVSync sdl-renderer 1)
+
+     (let [logical-w 640
+           logical-h 360]
+       (cpp/SDL_SetRenderLogicalPresentation sdl-renderer logical-w logical-h cpp/SDL_LOGICAL_PRESENTATION_LETTERBOX))
+
+     (loop [game (engine/init game)]
+       (if-not (or (:end? game) (and stop-atom @stop-atom))
+         (let [game' (engine/tick game)]
+           (cpp/SDL_SetRenderDrawColor sdl-renderer 25 25 32 255)
+           (cpp/SDL_RenderClear sdl-renderer)
+
+           (engine/render! game')
+
+           (cpp/SDL_RenderPresent sdl-renderer)
+           (recur game'))
+         (doto game (engine/clean!) (clean!)))))))
+
+(defn clean! [{:keys [sdl-renderer sdl-window]}]
+  (when sdl-renderer (cpp/SDL_DestroyRenderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer)))
+  (when sdl-window (cpp/SDL_DestroyWindow (cpp/unbox (:* cpp/SDL_Window) sdl-window)))
+  (cpp/SDL_Quit))

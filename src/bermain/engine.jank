@@ -1,0 +1,25 @@
+(ns bermain.engine
+  (:require
+   [bermain.engine.world :as world]
+   [bermain.engine.world-mutator :as world-mutator]
+   [bermain.sdl3.audio :as audio]
+   [bermain.sdl3.sdl3-input :as sdl3-input]
+   [bermain.sdl3.text :as text]
+   [bermain.sdl3.time :as time]
+   [bermain.sdl3.error :as error]))
+
+(defn init [game]
+  (-> game (time/init) (audio/init) (text/init) (#_dev-only world-mutator/init)
+      (world/init)))
+
+(defn tick [game]
+  (-> game (sdl3-input/poll-events) (world/tick) (time/flow) (audio/flow)))
+
+(defn render! [game]
+  (text/render! game))
+
+(defn clean! [game]
+  (doto game
+    (audio/clean!)
+    (text/clean!)
+    (error/clean!)))

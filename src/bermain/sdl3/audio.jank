@@ -1,0 +1,70 @@
+(ns bermain.sdl3.audio
+  (:include
+   "SDL3_mixer/SDL_mixer.h")
+  (:require
+   [bermain.engine.world :as world]
+   [bermain.sdl3.time :as time]
+   [bermain.sdl3.error :refer [must-be-some must-be-true]]
+   [odoyle.rules :as o]))
+
+(defn playing? [^(:* cpp/MIX_Track) track]
+  (cpp/MIX_TrackPlaying track))
+
+(defn set-track [^(:* cpp/MIX_Track) track ^(:* cpp/MIX_Audio) audio]
+  (cpp/MIX_SetTrackAudio track audio))
+
+(defn play [^(:* cpp/MIX_Track) track]
+  (cpp/MIX_PlayTrack track 0))
+
+(defn play-tututu
+  [{:keys [::sfx-track-pool ::time-last-sfx-played]
+    current ::time/total :as game}]
+  (if (> (- current time-last-sfx-played) 0.1)
+    (do (when-let [sfx-track (first (remove playing? sfx-track-pool))]
+          (play sfx-track))
+        (assoc game ::time-last-sfx-played current))
+    game))
+
+(def rules
+  (o/ruleset
+   {::play-bgm-a
+    [:what [esse-id ::play-tututu true]]
+
+    ::play-tututu
+    [:what [esse-id ::play-tututu true]]}))
+
+(defn init [game]
+  (must-be-true (cpp/MIX_Init))
+
+  (let [mixer          (must-be-some (cpp/MIX_CreateMixerDevice cpp/SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK cpp/nullptr))
+        dialogue-sfx   (cpp/box (must-be-some (cpp/MIX_LoadAudio mixer "res/click2.ogg" true)))
+        bgm            (cpp/box (must-be-some (cpp/MIX_LoadAudio mixer "res/pixelspheremegamix.ogg" true)))
+        bgm-track      (cpp/box (must-be-some (cpp/MIX_CreateTrack mixer)))
+        sfx-track-pool (letfn [(create-dialogue-sfx-track []
+                                 (let [sfx-track (cpp/box (must-be-some (cpp/MIX_CreateTrack mixer)))]
+                                   (set-track sfx-track dialogue-sfx)
+                                   sfx-track))]
+                         (vec (take 4 (repeatedly create-dialogue-sfx-track))))]
+    (set-track bgm-track bgm)
+    (play bgm-track)
+    (-> game
+        (assoc ::bgm-track bgm-track
+               ::sfx-track-pool sfx-track-pool
+               ::time-last-sfx-played 0)
+        (world/establish rules))))
+
+(defn flow
+  [game]
+  (if (world/ask-one game ::play-tututu)
+    (play-tututu game)
+    game))
+
+(defn clean! [_game]
+  (cpp/MIX_Quit))
+
+(comment
+  (require '[bermain.engine.world-mutator :refer [inject-facts!]])
+
+  (inject-facts! [:any {::play-tututu false}])
+
+  :-)
