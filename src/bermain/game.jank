@@ -15,8 +15,8 @@
 
    (let [main-scale   (cpp/SDL_GetDisplayContentScale (cpp/SDL_GetPrimaryDisplay))
          window-flags (bit-or cpp/SDL_WINDOW_RESIZABLE cpp/SDL_WINDOW_HIDDEN cpp/SDL_WINDOW_HIGH_PIXEL_DENSITY)
-         width        (int (* 640 main-scale))
-         height       (int (* 360 main-scale))
+         width        (int (* 769 main-scale))
+         height       (int (* 546 main-scale))
          game         {}
          sdl-window   (must-be-some
                        (cpp/SDL_CreateWindow "Hello again jank + sdl3!" width height window-flags)
@@ -36,8 +36,8 @@
      (cpp/SDL_ShowWindow sdl-window)
      (cpp/SDL_SetRenderVSync sdl-renderer 1)
 
-     (let [logical-w 640
-           logical-h 360]
+     (let [logical-w 769
+           logical-h 546]
        (cpp/SDL_SetRenderLogicalPresentation sdl-renderer logical-w logical-h cpp/SDL_LOGICAL_PRESENTATION_LETTERBOX))
 
      (loop [game (engine/init game)]

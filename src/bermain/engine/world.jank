@@ -37,3 +37,7 @@
 
 (defn tick [game]
   (update game ::this o/fire-rules))
+
+
+;; just so lsp pick it up
+::pos2d #_{:x 0 :y 0}

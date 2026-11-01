@@ -10,7 +10,7 @@
    [bermain.sdl3.sdl3 :as sdl3]
    [odoyle.rules :as o]))
 
-(def textures-atom (atom {}))
+(defonce textures-atom (atom {}))
 
 (def rules
   (o/ruleset
@@ -30,23 +30,26 @@
 
     ::loaded-images
     [:what
-     [esse-id ::loaded? true]]}))
+     [esse-id ::loaded? true]
+     [esse-id ::world/pos2d pos2d]]}))
 
 (defn world-init [world _game]
   (-> world
-      (o/insert :root ::images-atom textures-atom)
-      (o/insert :carmine {::image-path "res/images/carmine.PNG"})))
+      (o/insert :carmine {::image-path "res/images/carmine.PNG"
+                          ::world/pos2d {:x 30.0 :y 50.0}})
+      (o/insert :conveyor {::image-path "res/images/conveyor.PNG"
+                           ::world/pos2d {:x 0.0 :y 320.0}})))
 
 (defn init [game]
   (world/establish game rules world-init))
 
 (defn render! [game]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))]
-    (doseq [{:keys [esse-id]} (world/ask-many game ::loaded-images)]
+    (doseq [{:keys [esse-id] {:keys [x y]} :pos2d} (world/ask-many game ::loaded-images)]
       (when-let [texture-box (get @textures-atom esse-id)]
         (let [texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
-              src-rect (cpp/SDL_FRect 0.0 0.0 211.0 277.0)
-              dst-rest (cpp/SDL_FRect 0.0 0.0 211.0 277.0)]
+              src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
+              dst-rest (cpp/SDL_FRect x y (.-w texture) (.-h texture))]
           (cpp/SDL_RenderTexture renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))))
 
 (defn clean! [_game]
@@ -58,6 +61,7 @@
   (require '[bermain.engine.world-mutator :refer [inject-facts!]])
 
   (inject-facts!
-   [:carmine {::image-path "res/images/carmine.PNG"}])
+   [:carmine {::world/pos2d {:x 30.0 :y 50.0}}]
+   [:conveyor {::world/pos2d {:x 0.0 :y 320.0}}])
 
   :-)
