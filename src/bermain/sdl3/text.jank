@@ -28,7 +28,7 @@
     (when (seq (:bermain.sdl3.sdl3-input/pressed? game))
       (tap> (:bermain.sdl3.sdl3-input/pressed? game)))
     (doto text
-      (cpp/TTF_SetTextColor 255 255 255 cpp/SDL_ALPHA_OPAQUE)
+      (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
       (cpp/TTF_SetTextString (str debug-fps) 0)
       (cpp/TTF_DrawRendererText 16.0 10.0))
     :done))

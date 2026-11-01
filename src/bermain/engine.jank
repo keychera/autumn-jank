@@ -1,14 +1,15 @@
 (ns bermain.engine
   (:require
+   [bermain.engine.fact-queue :as fact-queue]
    [bermain.engine.world :as world]
    [bermain.engine.world-mutator :as world-mutator]
    [bermain.sdl3.audio :as audio]
    [bermain.sdl3.error :as error]
    [bermain.sdl3.image :as image]
+   [bermain.sdl3.sdl3 :as sdl3]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
-   [bermain.sdl3.time :as time]
-   [bermain.sdl3.sdl3 :as sdl3]))
+   [bermain.sdl3.time :as time]))
 
 (defn init [game]
   (-> game
@@ -24,10 +25,10 @@
 (defn tick [game]
   (-> game
       (sdl3-input/poll-events)
+      (fact-queue/flow)
       (world/tick)
       (time/flow)
-      (audio/flow)
-      (image/flow)))
+      (audio/flow)))
 
 (defn render! [game]
   (image/render! game)

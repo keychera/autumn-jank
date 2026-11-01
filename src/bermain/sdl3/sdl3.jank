@@ -6,10 +6,10 @@
 (def rules
   (o/ruleset
    {::sdl3-root
-    [:what [:root ::renderer sdl-renderer]]}))
+    [:what [:root ::renderer-box sdl-renderer]]}))
 
 (defn world-init [world {:keys [sdl-renderer]}]
-  (o/insert world :root ::renderer sdl-renderer))
+  (o/insert world :root ::renderer-box sdl-renderer))
 
 (defn init [game]
   (world/establish game rules world-init))

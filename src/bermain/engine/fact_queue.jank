@@ -1,0 +1,14 @@
+(ns bermain.engine.fact-queue
+  (:require
+   [bermain.engine.world :as world]))
+
+(def fact-queue (atom []))
+
+(defn queue-new-fact! [fact]
+  (swap! fact-queue conj fact))
+
+(defn flow [game]
+  (if-let [facts-to-insert (seq @fact-queue)]
+    (do (reset! fact-queue [])
+        (reduce world/new-fact game facts-to-insert))
+    game))
