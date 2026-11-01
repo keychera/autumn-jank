@@ -3,23 +3,39 @@
    [bermain.engine.world :as world]
    [bermain.engine.world-mutator :as world-mutator]
    [bermain.sdl3.audio :as audio]
+   [bermain.sdl3.error :as error]
+   [bermain.sdl3.image :as image]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
-   [bermain.sdl3.error :as error]))
+   [bermain.sdl3.sdl3 :as sdl3]))
 
 (defn init [game]
-  (-> game (time/init) (audio/init) (text/init) (#_dev-only world-mutator/init)
+  (-> game
+      (time/init)
+      (sdl3/init)
+      (audio/init)
+      (text/init)
+      (image/init)
+
+      (#_dev-only world-mutator/init)
       (world/init)))
 
 (defn tick [game]
-  (-> game (sdl3-input/poll-events) (world/tick) (time/flow) (audio/flow)))
+  (-> game
+      (sdl3-input/poll-events)
+      (world/tick)
+      (time/flow)
+      (audio/flow)
+      (image/flow)))
 
 (defn render! [game]
+  (image/render! game)
   (text/render! game))
 
 (defn clean! [game]
   (doto game
-    (audio/clean!)
+    (image/clean!)
     (text/clean!)
+    (audio/clean!)
     (error/clean!)))

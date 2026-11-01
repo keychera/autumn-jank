@@ -1,0 +1,68 @@
+(ns bermain.sdl3.image
+  (:include
+   "SDL3/SDL.h"
+   "SDL3_image/SDL_image.h")
+  (:require
+   [bermain.engine.world :as world]
+   [bermain.engine.utils :refer [s->]]
+   [bermain.sdl3.sdl3 :as sdl3]
+   [odoyle.rules :as o]))
+
+(def textures-atom (atom {}))
+(def fact-queue (atom [])) ;; maybe can be generalized
+
+(def rules
+  (o/ruleset
+   {::load-image
+    [:what
+     [:root ::sdl3/renderer sdl-renderer]
+     [esse-id ::image-path image-path]
+     [esse-id ::loaded? false]
+     :then
+     (println "loading" esse-id)
+     (future
+       (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer)
+             texture  (doto (cpp/IMG_LoadTexture renderer image-path)
+                        (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
+         (swap! textures-atom assoc esse-id (cpp/box texture))
+         (swap! fact-queue conj [esse-id ::loaded? true])))
+     (s-> session (o/retract esse-id ::image-path))]
+
+    ::loaded-images
+    [:what
+     [esse-id ::loaded? true]]}))
+
+(defn world-init [world _game]
+  (o/insert world :root ::images-atom textures-atom))
+
+(defn init [game]
+  (world/establish game rules world-init))
+
+(defn flow [game]
+  (if-let [facts-to-insert (seq @fact-queue)]
+    (do (reset! fact-queue [])
+        (reduce world/new-fact game facts-to-insert))
+    game))
+
+(defn render! [game]
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))]
+    (doseq [{:keys [esse-id]} (world/ask-many game ::loaded-images)]
+      (when-let [texture-box (get @textures-atom esse-id)]
+        (let [texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
+              src-rect (cpp/SDL_FRect 0.0 0.0 211.0 277.0)
+              dst-rest (cpp/SDL_FRect 0.0 0.0 211.0 277.0)]
+          (cpp/SDL_RenderTexture renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))))
+
+(defn clean! [_game]
+  (doseq [[_ texture] @textures-atom]
+    (cpp/SDL_DestroyTexture (cpp/unbox (:* cpp/SDL_Texture) texture)))
+  (reset! textures-atom {}))
+
+(comment
+  (require '[bermain.engine.world-mutator :refer [inject-facts!]])
+
+  (inject-facts!
+   [:carmine {::image-path "res/images/carmine.PNG"
+              ::loaded? false}])
+
+  :-)

@@ -24,7 +24,7 @@
   (o/ruleset
    {::world-mutator
     [:what
-     [:root ::time/delta dt]
+     [::time/now ::time/delta dt]
      [:root ::world-mutator world-mutator]
      :then
      (when-let [mutator-fn @world-mutator]
@@ -42,8 +42,8 @@
   (add-tap put-into-debug-tap)
   (world/establish game rules world-init))
 
-(comment 
-  
+(comment
+
   debug-tap
 
   :-)

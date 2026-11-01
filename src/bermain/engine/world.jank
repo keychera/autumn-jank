@@ -11,11 +11,17 @@
      true (update ::rules (fnil into []) rules)
      init-fn (update ::init-fns (fnil conj []) init-fn))))
 
-(defn new-fact [game esse-id attr->val]
-  (update game ::this o/insert esse-id attr->val))
+(defn new-fact
+  ([game fact]
+   (update game ::this o/insert fact))
+  ([game esse-id attr->val]
+   (update game ::this o/insert esse-id attr->val)))
 
 (defn ask-one [game rule-name]
   (utils/query-one (::this game) rule-name))
+
+(defn ask-many [game rule-name]
+  (o/query-all (::this game) rule-name))
 
 (defn esse
   "insert an esse given the facts in the shape of maps of attr->value.

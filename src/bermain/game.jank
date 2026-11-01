@@ -43,7 +43,7 @@
      (loop [game (engine/init game)]
        (if-not (or (:end? game) (and stop-atom @stop-atom))
          (let [game' (engine/tick game)]
-           (cpp/SDL_SetRenderDrawColor sdl-renderer 25 25 32 255)
+           (cpp/SDL_SetRenderDrawColor sdl-renderer 232 232 232 255)
            (cpp/SDL_RenderClear sdl-renderer)
 
            (engine/render! game')
