@@ -19,11 +19,12 @@
       (text/init)
       (image/init)
 
-      (#_dev-only world-mutator/init)
       (world/init)))
 
 (defn tick [game]
   (-> game
+      (#_dev-only world-mutator/flow)
+
       (sdl3-input/poll-events)
       (fact-queue/flow)
       (world/tick)

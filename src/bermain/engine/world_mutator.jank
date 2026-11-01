@@ -1,8 +1,6 @@
 (ns bermain.engine.world-mutator
   (:require
-   [bermain.engine.utils :refer [s->]]
-   [bermain.sdl3.time :as time]
-   [bermain.engine.world :as world :refer [esse]]
+   [bermain.engine.world :as world]
    [odoyle.rules :as o]))
 
 (defonce world-mutator (atom nil))
@@ -20,19 +18,11 @@
              world facts)))
   (str "inserted " (count (into [] (mapcat second) facts)) " fact(s)"))
 
-(def rules
-  (o/ruleset
-   {::world-mutator
-    [:what
-     [::time/now ::time/delta dt]
-     [:root ::world-mutator world-mutator]
-     :then
-     (when-let [mutator-fn @world-mutator]
-       (reset! world-mutator nil)
-       (s-> (mutator-fn session)))]}))
-
-(defn world-init [world _game]
-  (esse world :root {::world-mutator world-mutator}))
+(defn flow [game]
+  (if-let [mutator-fn @world-mutator]
+    (do (reset! world-mutator nil)
+        (update game ::world/this mutator-fn))
+    game))
 
 (defn put-into-debug-tap [x]
   #_{:clj-kondo/ignore [:inline-def]}
@@ -40,7 +30,7 @@
 
 (defn init [game]
   (add-tap put-into-debug-tap)
-  (world/establish game rules world-init))
+  game)
 
 (comment
 
