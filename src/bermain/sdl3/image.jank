@@ -12,6 +12,9 @@
 
 (defonce textures-atom (atom {}))
 
+(defn destroy-texture [^(:* cpp/SDL_Texture) texture]
+  (cpp/SDL_DestroyTexture texture))
+
 (def rules
   (o/ruleset
    {::load-image
@@ -19,34 +22,31 @@
      [:root ::sdl3/renderer-box sdl-renderer-box]
      [esse-id ::image-path image-path]
      :then
-     (println "load-image" esse-id)
-     (future
-       (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-             texture  (doto (must-be-some (cpp/IMG_LoadTexture renderer image-path))
-                        (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
-         (swap! textures-atom assoc esse-id (cpp/box texture))
-         (queue-new-fact! [esse-id ::loaded? true])))
+     (let [previous-texture (get @textures-atom esse-id)]
+       (when previous-texture
+         (destroy-texture previous-texture))
+       (future
+         (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+               texture  (doto (must-be-some (cpp/IMG_LoadTexture renderer image-path))
+                          (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
+           (swap! textures-atom assoc esse-id (cpp/box texture))
+           (queue-new-fact! [esse-id ::loaded? true]))))
      (s-> session (o/retract esse-id ::image-path))]
 
     ::loaded-images
     [:what
-     [esse-id ::loaded? true]
+     [esse-id ::use image-id]
      [esse-id ::world/pos2d pos2d]]}))
 
-(defn world-init [world _game]
-  (-> world
-      (o/insert :carmine {::image-path "res/images/carmine.PNG"
-                          ::world/pos2d {:x 30.0 :y 50.0}})
-      (o/insert :conveyor {::image-path "res/images/conveyor.PNG"
-                           ::world/pos2d {:x 0.0 :y 320.0}})))
-
 (defn init [game]
-  (world/establish game rules world-init))
+  (world/establish game rules))
 
 (defn render! [game]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))]
-    (doseq [{:keys [esse-id] {:keys [x y]} :pos2d} (world/ask-many game ::loaded-images)]
-      (when-let [texture-box (get @textures-atom esse-id)]
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))
+        images (->> (world/ask-many game ::loaded-images)
+                    (sort-by (comp :y :pos2d)))]
+    (doseq [{:keys [image-id] {:keys [x y]} :pos2d} images]
+      (when-let [texture-box (get @textures-atom image-id)]
         (let [texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
               src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
               dst-rest (cpp/SDL_FRect x y (.-w texture) (.-h texture))]
@@ -56,12 +56,3 @@
   (doseq [[_ texture] @textures-atom]
     (cpp/SDL_DestroyTexture (cpp/unbox (:* cpp/SDL_Texture) texture)))
   (reset! textures-atom {}))
-
-(comment
-  (require '[bermain.engine.world-mutator :refer [inject-facts!]])
-
-  (inject-facts!
-   [:carmine {::world/pos2d {:x 30.0 :y 50.0}}]
-   [:conveyor {::world/pos2d {:x 0.0 :y 320.0}}])
-
-  :-)

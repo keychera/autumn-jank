@@ -1,0 +1,80 @@
+(ns bermain.potion.potion-factory
+  (:require
+   [bermain.engine.utils :refer [s->]]
+   [bermain.engine.world :as world]
+   [bermain.sdl3.image :as image]
+   [bermain.sdl3.time :as time]
+   [odoyle.rules :as o]))
+
+(def deposit-line 530.0)
+
+(defn world-init [world _game]
+  (-> (reduce-kv
+       (fn [world esse-id image-path]
+         (o/insert world esse-id ::image/image-path image-path))
+       world {:carmine-img "res/images/carmine.PNG"
+              :conveyor-img "res/images/conveyor.PNG"
+              :potion1-img "res/images/potion1.PNG"
+              :potion2-img "res/images/potion2.PNG"
+              :potion1NG-img "res/images/potion1NG.PNG"
+              :potion2NG-img "res/images/potion2NG.PNG"})
+      (o/insert :carmine {::image/use :carmine-img
+                          ::world/pos2d {:x 30.0 :y 50.0}})
+      (o/insert :conveyor {::image/use :conveyor-img
+                           ::world/pos2d {:x 0.0 :y 320.0}})
+      (o/insert :potion1 {::image/use :potion1-img
+                          ::world/pos2d {:x 30.0 :y 335.0}
+                          ::potion-state ::on-conveyor})
+      (o/insert :potion2 {::image/use :potion2-img
+                          ::world/pos2d {:x 160.0 :y 335.0}
+                          ::potion-state ::on-conveyor})))
+
+(def rules
+  (o/ruleset
+   {::put-on-conveyor-belt
+    [:what
+     [:root ::put-on-conveyor-belt true]
+     :then
+     (let [potion-id (keyword (str "potion" (random-uuid)))
+           potions [:potion1-img :potion2-img :potion1NG-img :potion2NG-img]
+           rand-y  [-20 0 20]]
+       (s-> session
+            (o/insert potion-id {::image/use (rand-nth potions)
+                                 ::world/pos2d {:x -20 :y (+ 335.0 (rand-nth rand-y))}
+                                 ::potion-state ::on-conveyor})))]
+
+    ::conveyor-belt
+    [:what
+     [::time/now ::time/delta dt]
+     [esse-id ::potion-state ::on-conveyor]
+     [esse-id ::world/pos2d pos2d {:then false}]
+     :then
+     (if (< (:x pos2d) deposit-line)
+       (s-> session
+            (o/insert esse-id ::world/pos2d (update pos2d :x + (* 74 dt))))
+       (s-> session
+            (o/insert esse-id ::potion-state ::deposit)))]
+
+    ::deposit
+    [:what
+     [esse-id ::potion-state ::deposit]
+     :then
+     (s-> session
+          (o/retract esse-id ::potion-state)
+          (o/retract esse-id ::world/pos2d))]}))
+
+(defn init [game]
+  (world/establish game rules world-init))
+
+(defn render! [game]
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))]
+    (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
+    (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))
+
+(comment
+  (require '[bermain.engine.world-mutator :refer [inject-facts!]])
+
+  (inject-facts!
+   [:root {::put-on-conveyor-belt true}])
+
+  :-)

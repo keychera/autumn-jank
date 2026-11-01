@@ -3,6 +3,7 @@
    [bermain.engine.fact-queue :as fact-queue]
    [bermain.engine.world :as world]
    [bermain.engine.world-mutator :as world-mutator]
+   [bermain.potion.potion-factory :as potion-factory]
    [bermain.sdl3.audio :as audio]
    [bermain.sdl3.error :as error]
    [bermain.sdl3.image :as image]
@@ -18,6 +19,10 @@
       (audio/init)
       (text/init)
       (image/init)
+
+      #_game
+      (potion-factory/init)
+
       (#_must-be-last world/init)))
 
 (defn tick [game]
@@ -32,6 +37,9 @@
 
 (defn render! [game]
   (image/render! game)
+
+  (potion-factory/render! game)
+
   (text/render! game))
 
 (defn clean! [game]
