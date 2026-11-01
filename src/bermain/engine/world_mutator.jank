@@ -3,7 +3,13 @@
    [bermain.engine.world :as world]
    [odoyle.rules :as o]))
 
-(defonce world-mutator (atom nil))
+(defn put-into-debug-tap [x]
+  #_{:clj-kondo/ignore [:inline-def]}
+  (def debug-tap x))
+
+(defonce world-mutator 
+  (do (add-tap put-into-debug-tap)
+      (atom nil)))
 
 (defn mutate-world! [mutate-fn]
   ;; this is not swap! by design!
@@ -23,14 +29,6 @@
     (do (reset! world-mutator nil)
         (update game ::world/this mutator-fn))
     game))
-
-(defn put-into-debug-tap [x]
-  #_{:clj-kondo/ignore [:inline-def]}
-  (def debug-tap x))
-
-(defn init [game]
-  (add-tap put-into-debug-tap)
-  game)
 
 (comment
 

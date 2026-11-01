@@ -19,7 +19,7 @@
          height       (int (* 546 main-scale))
          game         {}
          sdl-window   (must-be-some
-                       (cpp/SDL_CreateWindow "Hello again jank + sdl3!" width height window-flags)
+                       (cpp/SDL_CreateWindow "Potion Inspector" width height window-flags)
                        #_or (clean! game))
          _            (reset! error/sdl-window* (cpp/box sdl-window))
          game         (assoc game :sdl-window (cpp/box sdl-window))
@@ -31,7 +31,7 @@
          game         (assoc game
                              :sdl-renderer (cpp/box sdl-renderer)
                              :kb-state     (cpp/box kb-state))]
-     (cpp/SDL_SetWindowPosition sdl-window 1500 900)
+     (cpp/SDL_SetWindowPosition sdl-window 1400 700)
      (cpp/SDL_SetWindowAlwaysOnTop sdl-window true)
      (cpp/SDL_ShowWindow sdl-window)
      (cpp/SDL_SetRenderVSync sdl-renderer 1)

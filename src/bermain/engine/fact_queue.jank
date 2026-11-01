@@ -2,7 +2,7 @@
   (:require
    [bermain.engine.world :as world]))
 
-(def fact-queue (atom []))
+(defonce fact-queue (atom []))
 
 (defn queue-new-fact! [fact]
   (swap! fact-queue conj fact))

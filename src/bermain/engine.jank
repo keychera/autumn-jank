@@ -18,8 +18,7 @@
       (audio/init)
       (text/init)
       (image/init)
-
-      (world/init)))
+      (#_must-be-last world/init)))
 
 (defn tick [game]
   (-> game
