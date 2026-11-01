@@ -31,26 +31,12 @@
                           (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
            (swap! textures-atom assoc esse-id (cpp/box texture))
            (queue-new-fact! [esse-id ::loaded? true]))))
-     (s-> session (o/retract esse-id ::image-path))]
-
-    ::loaded-images
-    [:what
-     [esse-id ::use image-id]
-     [esse-id ::world/pos2d pos2d]]}))
+     (s-> session (o/retract esse-id ::image-path))]}))
 
 (defn init [game]
   (world/establish game rules))
 
-(defn render! [game]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer-box game))
-        images (->> (world/ask-many game ::loaded-images)
-                    (sort-by (comp :y :pos2d)))]
-    (doseq [{:keys [image-id] {:keys [x y]} :pos2d} images]
-      (when-let [texture-box (get @textures-atom image-id)]
-        (let [texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
-              src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
-              dst-rest (cpp/SDL_FRect x y (.-w texture) (.-h texture))]
-          (cpp/SDL_RenderTexture renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))))
+(defn render! [_game])
 
 (defn clean! [_game]
   (doseq [[_ texture] @textures-atom]

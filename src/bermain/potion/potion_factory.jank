@@ -1,6 +1,8 @@
 (ns bermain.potion.potion-factory
   (:include
-   "SDL3/SDL.h")
+   "SDL3/SDL.h"
+   "choreograph/Choreograph.h"
+   "choreograph/Easing.h")
   (:require
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
@@ -8,6 +10,37 @@
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
+
+(cpp/raw
+ "// from choreograph samples
+  struct vec2 {
+    vec2(double x = 0.0f, double y = 0.0f) : x(x), y(y) {}
+
+    vec2 &operator+=(const vec2 &o) {
+        *this = *this + o;
+        return *this;
+    }
+    vec2 operator+(const vec2 &o) const { return {x + o.x, y + o.y}; }
+    vec2 operator-(const vec2 &o) const { return {x - o.x, y - o.y}; }
+    vec2 operator*(double s) const { return {x * s, y * s}; }
+    vec2 operator*(const vec2 &o) const { return {x * o.x, y * o.y}; }
+
+    double x, y;
+};
+  
+  using namespace choreograph;
+  
+  template <typename T, typename... Args>
+  void thenHold(Sequence<T>& sequence, Args&&... args) {
+      sequence.template then<Hold>(std::forward<Args>(args)...);
+  }
+  
+  template <typename T, typename... Args>
+  void thenRampTo(Sequence<T>& sequence, Args&&... args) {
+      sequence.template then<RampTo>(std::forward<Args>(args)...);
+  }
+  
+  using CSI = Sequence<int>;")
 
 (def deposit-line 530.0)
 
@@ -43,28 +76,63 @@
            rand-y  [-20 0 20]]
        (s-> session
             (o/insert potion-id {::image/use (rand-nth potions)
-                                 ::world/pos2d {:x -20 :y (+ 335.0 (rand-nth rand-y))}
+                                 ::world/pos2d {:x -20.0 :y (+ 335.0 (rand-nth rand-y))}
                                  ::potion-state ::on-conveyor})))]
+
+    ::pos2d->vec2
+    [:what [esse-id ::world/pos2d pos2d]
+     :then
+     (let [vec2-box (cpp/box (cpp/new cpp/vec2 (:x pos2d) (:y pos2d)))]
+       (s-> session
+            (o/retract esse-id ::world/pos2d)
+            (o/insert esse-id ::vec2-box vec2-box)))]
+
+    ::images-to-render
+    [:what
+     [esse-id ::image/use image-id]
+     [esse-id ::vec2-box vec2-box]]
 
     ::conveyor-belt
     [:what
      [::time/now ::time/delta dt]
      [esse-id ::potion-state ::on-conveyor]
-     [esse-id ::world/pos2d pos2d {:then false}]
+     [esse-id ::vec2-box vec2-box {:then false}]
      :then
-     (if (< (:x pos2d) deposit-line)
-       (s-> session
-            (o/insert esse-id ::world/pos2d (update pos2d :x + (* 74 dt))))
-       (s-> session
-            (o/insert esse-id ::potion-state ::deposit)))]
+     (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+       (if (< (.-x vec2) deposit-line)
+         (cpp/+= (.-x vec2) (* 74.0 dt))
+         (s-> session
+              (o/insert esse-id ::potion-state ::deposit))))]
 
     ::deposit
     [:what
      [esse-id ::potion-state ::deposit]
+     [esse-id ::vec2-box vec2-box {:then false}]
      :then
-     (s-> session
-          (o/retract esse-id ::potion-state)
-          (o/retract esse-id ::world/pos2d))]}))
+     (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
+           deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))]
+       (doto (cpp/* deposit-anime)
+         (cpp/thenRampTo (cpp/vec2 0.0 (.-y vec2)) 4.0 (cpp/choreograph.EaseInOutQuad))
+         (cpp/thenRampTo (cpp/vec2 (.-x vec2) (.-y vec2)) 4.0 (cpp/choreograph.EaseInOutQuad)))
+       (s-> session
+            (o/retract esse-id ::potion-state)
+            (o/insert esse-id {::anime-time 0.0
+                               ::anime-box (cpp/box deposit-anime)})))]
+
+    ::deposit-anime
+    [:what
+     [::time/now ::time/delta dt]
+     [esse-id ::anime-box anime-box]
+     [esse-id ::anime-time anime-time {:then false}]
+     [esse-id ::vec2-box vec2-box {:then false}]
+     :then
+     (tap> [anime-time dt])
+     (let [vec2  (cpp/unbox (:* cpp/vec2) vec2-box)
+           anime (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) anime-box)
+           vec2' (.getValueWrapped (cpp/* anime) anime-time)]
+       (cpp/= (.-x vec2) (.-x vec2'))
+       (cpp/= (.-y vec2) (.-y vec2'))
+       (s-> session (o/insert esse-id ::anime-time (+ anime-time dt))))]}))
 
 (defn init [game]
   (world/establish game rules world-init))
@@ -72,23 +140,42 @@
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
     text-box ::text/text
-    main-scale :main-scale}]
+    main-scale :main-scale
+    :as game}]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
         text     (cpp/unbox (:* cpp/TTF_Text) text-box)
-        mouse-x  (cpp/float)
-        mouse-y  (cpp/float)]
-    (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
-    (doto text
-      (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
-      (cpp/TTF_SetTextString (str (format "{:.2f}" (/ mouse-x main-scale))
-                                  ", "
-                                  (format "{:.2f}" (/ mouse-y main-scale))) 0)
-      (cpp/TTF_DrawRendererText 16.0 32.0))
-    (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
-    (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))
+        images   (->> (world/ask-many game ::images-to-render)
+                      (sort-by (fn [{vec2-box :vec2-box}]
+                                 (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                                   (.-y vec2))) >))]
+
+    (doseq [{:keys [image-id] vec2-box :vec2-box} images]
+
+      (when-let [texture-box (get @image/textures-atom image-id)]
+        (let [vec2     (cpp/unbox (:* cpp/vec2) vec2-box)
+              texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
+              src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
+              dst-rest (cpp/SDL_FRect (.-x vec2) (.-y vec2) (.-w texture) (.-h texture))]
+          (cpp/SDL_RenderTexture renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))
+
+    ;; debug
+    (let [mouse-x (cpp/float)
+          mouse-y (cpp/float)]
+      (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
+      (doto text
+        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (cpp/TTF_SetTextString (str (format "{:.2f}" (/ mouse-x main-scale))
+                                    ", "
+                                    (format "{:.2f}" (/ mouse-y main-scale))) 0)
+        (cpp/TTF_DrawRendererText 16.0 32.0))
+
+      (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
+      (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0))))
 
 (comment
-  (require '[bermain.engine.world-mutator :refer [inject-facts!]])
+  (require '[bermain.engine.world-mutator :refer [inject-facts! debug-tap]])
+
+  debug-tap
 
   (inject-facts!
    [:root {::put-on-conveyor-belt true}])
