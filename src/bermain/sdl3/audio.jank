@@ -26,7 +26,6 @@
      [:root ::mixer-box mixer-box]
      [esse-id ::audio-path audio-path]
      :then
-     (println "load-audio" esse-id audio-path)
      (future
        (let [mixer (cpp/unbox (:* cpp/MIX_Mixer) mixer-box)
              audio (must-be-some (cpp/MIX_LoadAudio mixer audio-path true))]

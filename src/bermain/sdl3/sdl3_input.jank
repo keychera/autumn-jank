@@ -8,8 +8,8 @@
    ::d     cpp/SDL_SCANCODE_D
    ::space cpp/SDL_SCANCODE_SPACE})
 
-(defn process-input [{:keys [kb-state] :as prev-game}]
-  (let [kb-state (cpp/unbox (:* (:const cpp/bool)) kb-state)
+(defn process-input [{:keys [kb-state-box] :as prev-game}]
+  (let [kb-state (cpp/unbox (:* (:const cpp/bool)) kb-state-box)
         game     (assoc prev-game ::pressed? #{})]
     (reduce-kv
      (fn [game' keyname scancode]

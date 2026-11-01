@@ -1,6 +1,5 @@
 (ns bermain.sdl3.text
   (:include
-   "cmath"
    "SDL3_ttf/SDL_ttf.h")
   (:require
    [bermain.engine.world :as world]
@@ -13,7 +12,7 @@
 (defn init [game]
   (must-be-true (cpp/TTF_Init))
 
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer-box game))
         engine   (must-be-some (cpp/TTF_CreateRendererTextEngine renderer))
         font     (must-be-some (cpp/TTF_OpenFont "res/fonts/CardboardCrown/CardboardCrown.ttf" 32))
         text     (must-be-some (cpp/TTF_CreateText engine font "empty" 0))]

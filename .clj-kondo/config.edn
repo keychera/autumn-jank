@@ -1,0 +1,5 @@
+{:lint-as {bermain.engine.utils/s-> clojure.core/->}
+ :linters {:unresolved-symbol {:exclude [include]}
+           :unknown-ns-option {:level :off}
+           :unresolved-namespace {:exclude [cpp]}}
+ :ignore [:format]}

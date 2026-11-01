@@ -7,7 +7,7 @@
   #_{:clj-kondo/ignore [:inline-def]}
   (def debug-tap x))
 
-(defonce world-mutator 
+(defonce world-mutator
   (do (add-tap put-into-debug-tap)
       (atom nil)))
 

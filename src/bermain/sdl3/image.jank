@@ -42,7 +42,7 @@
   (world/establish game rules))
 
 (defn render! [game]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer-box game))
         images (->> (world/ask-many game ::loaded-images)
                     (sort-by (comp :y :pos2d)))]
     (doseq [{:keys [image-id] {:keys [x y]} :pos2d} images]

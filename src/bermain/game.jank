@@ -14,7 +14,7 @@
    (must-be-true (cpp/SDL_Init (bit-or cpp/SDL_INIT_VIDEO cpp/SDL_INIT_GAMEPAD)))
 
    (let [main-scale   (cpp/SDL_GetDisplayContentScale (cpp/SDL_GetPrimaryDisplay))
-         window-flags (bit-or cpp/SDL_WINDOW_RESIZABLE cpp/SDL_WINDOW_HIDDEN cpp/SDL_WINDOW_HIGH_PIXEL_DENSITY)
+         window-flags (bit-or cpp/SDL_WINDOW_HIDDEN cpp/SDL_WINDOW_HIGH_PIXEL_DENSITY)
          width        (int (* 769 main-scale))
          height       (int (* 546 main-scale))
          game         {}
@@ -29,8 +29,10 @@
          numkeys      (cpp/int)
          kb-state     (cpp/SDL_GetKeyboardState (cpp/& numkeys))
          game         (assoc game
-                             :sdl-renderer (cpp/box sdl-renderer)
-                             :kb-state     (cpp/box kb-state))]
+                             :main-scale       main-scale
+                             :sdl-renderer-box (cpp/box sdl-renderer)
+                             :sdl-window-box   (cpp/box sdl-window)
+                             :kb-state-box     (cpp/box kb-state))]
      (cpp/SDL_SetWindowPosition sdl-window 1400 700)
      (cpp/SDL_SetWindowAlwaysOnTop sdl-window true)
      (cpp/SDL_ShowWindow sdl-window)
@@ -52,7 +54,7 @@
            (recur game'))
          (doto game (engine/clean!) (clean!)))))))
 
-(defn clean! [{:keys [sdl-renderer sdl-window]}]
-  (when sdl-renderer (cpp/SDL_DestroyRenderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer)))
-  (when sdl-window (cpp/SDL_DestroyWindow (cpp/unbox (:* cpp/SDL_Window) sdl-window)))
+(defn clean! [{:keys [sdl-renderer-box sdl-window-box]}]
+  (when sdl-renderer-box (cpp/SDL_DestroyRenderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)))
+  (when sdl-window-box (cpp/SDL_DestroyWindow (cpp/unbox (:* cpp/SDL_Window) sdl-window-box)))
   (cpp/SDL_Quit))

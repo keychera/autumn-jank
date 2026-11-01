@@ -1,8 +1,11 @@
 (ns bermain.potion.potion-factory
+  (:include
+   "SDL3/SDL.h")
   (:require
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.sdl3.image :as image]
+   [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
 
@@ -66,8 +69,21 @@
 (defn init [game]
   (world/establish game rules world-init))
 
-(defn render! [game]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer game))]
+(defn render!
+  [{sdl-renderer-box :sdl-renderer-box
+    text-box ::text/text
+    main-scale :main-scale}]
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+        text     (cpp/unbox (:* cpp/TTF_Text) text-box)
+        mouse-x  (cpp/float)
+        mouse-y  (cpp/float)]
+    (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
+    (doto text
+      (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+      (cpp/TTF_SetTextString (str (format "{:.2f}" (/ mouse-x main-scale))
+                                  ", "
+                                  (format "{:.2f}" (/ mouse-y main-scale))) 0)
+      (cpp/TTF_DrawRendererText 16.0 32.0))
     (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
     (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))
 
