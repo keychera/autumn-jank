@@ -20,3 +20,9 @@ from kenney
 
     https://opengameart.org/content/the-hex-november-snow-the-charm-pixelsphere-megamix-steven-ruud-cynicmusic-remixed
 
+
+magick incantation
+
+```
+magick mogrify -trim +repage *.png
+```
