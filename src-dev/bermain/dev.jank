@@ -2,25 +2,27 @@
   (:require
    [bermain.game :as game]))
 
-(defonce stop-atom (atom false))
-(defn toggle-stop []
-  (if (swap! stop-atom not)
-    "stopping game!"
-    "starting game!"))
+(defonce start-atom (atom true))
+(defn start []
+  (if @start-atom
+    (println "already started!")
+    (do (reset! start-atom true)
+        "starting game!")))
 
 (defn dev []
   (future
     (while true
       (try
-        (when (not @stop-atom)
-          (#'game/-main {:stop-atom stop-atom})
-          (reset! stop-atom true))
+        (when @start-atom
+          (#'game/-main)
+          (reset! start-atom false))
         (catch cpp/jank.runtime.object_ref e
-          (println :caught e))))))
+          (println :caught e)
+          (reset! start-atom false))))))
 
 (defonce _ (dev))
 
 (comment
-  (toggle-stop)
+  (start)
 
   ::waiting-for-something-to-happen?)

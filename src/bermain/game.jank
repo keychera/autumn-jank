@@ -1,58 +1,74 @@
 (ns bermain.game
   (:include
    "SDL3/SDL.h"
+   "SDL3/SDL_main.h"
    "SDL3_image/SDL_image.h")
   (:require
    [bermain.engine :as engine]
    [bermain.sdl3.error :as error :refer [must-be-some must-be-true]]))
 
+(cpp/raw "
+namespace bermain::game {
+int jank_sdl_run(int argc, char *argv[]) {
+  using namespace jank::runtime;
+  auto main_var(__rt_ctx->find_var(\"bermain.game\", \"run-app\"));
+  return main_var.call().to_integer();
+}
+}")
+
 (declare clean!)
 
-(defn -main
-  ([] (-main {}))
-  ([{:keys [stop-atom]}]
-   (must-be-true (cpp/SDL_Init (bit-or cpp/SDL_INIT_VIDEO cpp/SDL_INIT_GAMEPAD)))
+(defn run-app
+  []
+  (must-be-true (cpp/SDL_Init (bit-or cpp/SDL_INIT_VIDEO cpp/SDL_INIT_GAMEPAD)))
 
-   (let [main-scale   (cpp/SDL_GetDisplayContentScale (cpp/SDL_GetPrimaryDisplay))
-         window-flags (bit-or cpp/SDL_WINDOW_HIDDEN cpp/SDL_WINDOW_HIGH_PIXEL_DENSITY)
-         width        (int (* 769 main-scale))
-         height       (int (* 546 main-scale))
-         game         {}
-         sdl-window   (must-be-some
-                       (cpp/SDL_CreateWindow "Potion Inspector" width height window-flags)
-                       #_or (clean! game))
-         _            (reset! error/sdl-window* (cpp/box sdl-window))
-         game         (assoc game :sdl-window (cpp/box sdl-window))
-         sdl-renderer (must-be-some
-                       (cpp/SDL_CreateRenderer sdl-window cpp/nullptr)
-                       #_or (clean! game))
-         numkeys      (cpp/int)
-         kb-state     (cpp/SDL_GetKeyboardState (cpp/& numkeys))
-         game         (assoc game
-                             :main-scale       main-scale
-                             :sdl-renderer-box (cpp/box sdl-renderer)
-                             :sdl-window-box   (cpp/box sdl-window)
-                             :kb-state-box     (cpp/box kb-state))]
-     (cpp/SDL_SetWindowPosition sdl-window 1400 700)
-     (cpp/SDL_SetWindowAlwaysOnTop sdl-window true)
-     (cpp/SDL_ShowWindow sdl-window)
-     (cpp/SDL_SetRenderVSync sdl-renderer 1)
+  (let [main-scale   (cpp/SDL_GetDisplayContentScale (cpp/SDL_GetPrimaryDisplay))
+        window-flags (bit-or cpp/SDL_WINDOW_HIDDEN cpp/SDL_WINDOW_HIGH_PIXEL_DENSITY)
+        width        (int (* 769 main-scale))
+        height       (int (* 546 main-scale))
+        game         {}
+        sdl-window   (must-be-some
+                      (cpp/SDL_CreateWindow "Potion Inspector" width height window-flags)
+                      #_or (clean! game))
+        _            (reset! error/sdl-window* (cpp/box sdl-window))
+        game         (assoc game :sdl-window (cpp/box sdl-window))
+        sdl-renderer (must-be-some
+                      (cpp/SDL_CreateRenderer sdl-window cpp/nullptr)
+                      #_or (clean! game))
+        numkeys      (cpp/int)
+        kb-state     (cpp/SDL_GetKeyboardState (cpp/& numkeys))
+        game         (assoc game
+                            :main-scale       main-scale
+                            :sdl-renderer-box (cpp/box sdl-renderer)
+                            :sdl-window-box   (cpp/box sdl-window)
+                            :kb-state-box     (cpp/box kb-state))]
+    (cpp/SDL_SetWindowPosition sdl-window 1400 700)
+    (cpp/SDL_SetWindowAlwaysOnTop sdl-window true)
+    (cpp/SDL_ShowWindow sdl-window)
+    (cpp/SDL_SetRenderVSync sdl-renderer 1)
 
-     (let [logical-w 769
-           logical-h 546]
-       (cpp/SDL_SetRenderLogicalPresentation sdl-renderer logical-w logical-h cpp/SDL_LOGICAL_PRESENTATION_LETTERBOX))
+    (let [logical-w 769
+          logical-h 546]
+      (cpp/SDL_SetRenderLogicalPresentation sdl-renderer logical-w logical-h cpp/SDL_LOGICAL_PRESENTATION_LETTERBOX))
 
-     (loop [game (engine/init game)]
-       (if-not (or (:end? game) (and stop-atom @stop-atom))
-         (let [game' (engine/tick game)]
-           (cpp/SDL_SetRenderDrawColor sdl-renderer 232 232 232 255)
-           (cpp/SDL_RenderClear sdl-renderer)
+    (loop [game (engine/init game)]
+      (if-not (:end? game)
+        (let [game' (engine/tick game)]
+          (cpp/SDL_SetRenderDrawColor sdl-renderer 232 232 232 255)
+          (cpp/SDL_RenderClear sdl-renderer)
 
-           (engine/render! game')
+          (engine/render! game')
 
-           (cpp/SDL_RenderPresent sdl-renderer)
-           (recur game'))
-         (doto game (engine/clean!) (clean!)))))))
+          (cpp/SDL_RenderPresent sdl-renderer)
+          (recur game'))
+        (doto game (engine/clean!) (clean!))))
+    0))
+
+(defn -main []
+  (let [argc 0
+        argv (cpp/cast (:* (:* char)) cpp/nullptr)]
+    (cpp/SDL_RunApp argc argv cpp/bermain.game.jank_sdl_run cpp/nullptr)
+    :done))
 
 (defn clean! [{:keys [sdl-renderer-box sdl-window-box]}]
   (when sdl-renderer-box (cpp/SDL_DestroyRenderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)))

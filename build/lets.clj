@@ -146,9 +146,10 @@
   (let [jedn (->jank-deps-edn @deps-basis)
         jout (-> @deps-basis :jank :compile-out)
         jcmd (jank-command jedn "compile" {:main-module (get-main-module @deps-basis)
-                                           :extra ["--name" jout "-O3"]})]
+                                           :extra ["-DSDL_MAIN_HANDLED" "--name" jout "-O3"]})]
     (log jcmd)
-    (b/process {:command-args jcmd})
+    (b/process {:env {"JANK_EXTRA_FLAGS" "-Wl,-subsystem,windows"}
+                :command-args jcmd})
     (gather-shared-libs)))
 
 (defn play [& _]
