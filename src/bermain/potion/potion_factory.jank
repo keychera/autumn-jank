@@ -1,6 +1,7 @@
 (ns bermain.potion.potion-factory
   (:include
    "SDL3/SDL.h"
+   "SDL3_ttf/SDL_ttf.h"
    "choreograph/Choreograph.h"
    "choreograph/Easing.h")
   (:require
