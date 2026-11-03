@@ -148,9 +148,10 @@
         jcmd (jank-command jedn "compile" {:main-module (get-main-module @deps-basis)
                                            :extra ["-DSDL_MAIN_HANDLED" "--name" jout "-O3"]})]
     (log jcmd)
-    (b/process {:env {"JANK_EXTRA_FLAGS" "-Wl,-subsystem,windows"}
-                :command-args jcmd})
-    (gather-shared-libs)))
+    (b/process (cond-> {:command-args jcmd}
+                 (fs/windows?) (assoc :env {"JANK_EXTRA_FLAGS" "-Wl,-subsystem,windows"})))
+    (when (fs/windows?)
+      (gather-shared-libs))))
 
 (defn play [& _]
   (let [main-exe (str @target-dir "/" (-> @deps-basis :jank :compile-out) ".exe")]

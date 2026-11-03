@@ -3,7 +3,7 @@
    [bermain.game :as game]))
 
 (defonce start-atom (atom true))
-(defn start []
+(defn toggle-start []
   (if @start-atom
     (println "already started!")
     (do (reset! start-atom true)
@@ -23,6 +23,6 @@
 (defonce _ (dev))
 
 (comment
-  (start)
+  (toggle-start)
 
   ::waiting-for-something-to-happen?)
