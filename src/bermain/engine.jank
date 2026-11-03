@@ -30,6 +30,7 @@
       (#_dev-only world-mutator/flow)
 
       (sdl3-input/poll-events)
+      (potion-factory/route-inputs)
       (fact-queue/flow)
       (world/tick)
       (time/flow)

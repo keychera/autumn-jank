@@ -10,6 +10,7 @@
    [bermain.engine.world :as world]
    [bermain.esse :as esse :refer [box-vec2]]
    [bermain.sdl3.image :as image]
+   [bermain.sdl3.sdl3-input :as input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
@@ -67,6 +68,11 @@
   (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
     (cpp/parsl_destroy_context sl-context)))
 
+(defn route-inputs [game]
+  (let [pressed? (::input/pressed? game)]
+    (cond-> game
+      (::input/space pressed?)
+      (world/new-fact :root {::put-on-conveyor-belt true}))))
 
 (defn world-init [world _game]
   (-> (reduce-kv
@@ -191,14 +197,14 @@
         text     (cpp/unbox (:* cpp/TTF_Text) text-box)]
 
     (tap> (::world/this game))
-    (let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) (::parsl-mesh-box game))
-          dummy-vert (cpp/unbox (:* cpp/SDL_Vertex) (::dummy-vert-box game))]
-      (cpp/SDL_SetRenderDrawColor renderer 25 25 25 cpp/SDL_ALPHA_OPAQUE)
-      (let [vertices (cpp/parsl_mesh_to_SDL_Vertices parsl-mesh)
-            indices  (cpp/parsl_mesh_to_indices parsl-mesh)]
-        (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))
+    #_(let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) (::parsl-mesh-box game))
+            dummy-vert (cpp/unbox (:* cpp/SDL_Vertex) (::dummy-vert-box game))]
+        (cpp/SDL_SetRenderDrawColor renderer 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (let [vertices (cpp/parsl_mesh_to_SDL_Vertices parsl-mesh)
+              indices  (cpp/parsl_mesh_to_indices parsl-mesh)]
+          (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))
 
-      (cpp/SDL_RenderGeometry renderer cpp/nullptr dummy-vert 3 cpp/nullptr 0))
+        (cpp/SDL_RenderGeometry renderer cpp/nullptr dummy-vert 3 cpp/nullptr 0))
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
@@ -206,25 +212,30 @@
 
     (let [potions
           (->> (world/ask-many game ::potions-to-render)
-               (sort-by (fn [{vec2-box :vec2-box}]
-                          (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                            (.-y vec2))) >))]
+               #_(sort-by (fn [{vec2-box :vec2-box}]
+                            (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                              (.-y vec2))) >))]
       (doseq [potion potions]
-        (render-this sdl-renderer-box potion)))
+        (render-this sdl-renderer-box potion))
 
-    ;; debug
-    (let [mouse-x (cpp/float)
-          mouse-y (cpp/float)]
-      (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
-      (doto text
-        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
-        (cpp/TTF_SetTextString (str (format "{:.2f}" (/ mouse-x main-scale))
-                                    ", "
-                                    (format "{:.2f}" (/ mouse-y main-scale))) 0)
-        (cpp/TTF_DrawRendererText 16.0 32.0))
+      ;; debug
+      (let [{:keys [debug-fps]} (world/ask-one game ::time/debug-fps)
+            num-of-potions (count potions)
+            mouse-x (cpp/float)
+            mouse-y (cpp/float)]
+        (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
+        (doto text
+          (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+          (cpp/TTF_SetTextString (str
+                                  debug-fps "\n"
+                                  (format "{:.2f}" (/ mouse-x main-scale))
+                                  ", "
+                                  (format "{:.2f}" (/ mouse-y main-scale))
+                                  "\npotions:" num-of-potions) 0)
+          (cpp/TTF_DrawRendererText 16.0 8.0))
 
-      (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
-      (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0))))
+        (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
+        (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))))
 
 (comment
   (require '[bermain.engine.world-mutator :refer [inject-facts! debug-tap]])
