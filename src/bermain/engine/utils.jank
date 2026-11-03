@@ -12,6 +12,11 @@
   [odoyle-session rule-name]
   (first (o/query-all odoyle-session rule-name)))
 
+(defn safe-retract [odoyle-session id attr]
+  (if (o/contains? odoyle-session id attr)
+    (o/retract odoyle-session id attr)
+    odoyle-session))
+
 (defn retract-many
   [odoyle-session id & attrs]
-  (reduce (fn [o attr] (o/retract o id attr)) odoyle-session attrs))
+  (reduce (fn [o attr] (safe-retract o id attr)) odoyle-session attrs))

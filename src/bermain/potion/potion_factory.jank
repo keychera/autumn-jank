@@ -167,7 +167,9 @@
          (do
            (cpp/delete anime)
            (cpp/delete vec2)
-           (s-> session (utils/retract-many esse-id ::image/use ::anime-box ::anime-time ::esse/vec2-box)))))]}))
+           (s->  (utils/retract-many
+                  session esse-id
+                  ::anime-box ::anime-time ::kind ::esse/vec2-box ::image/use)))))]}))
 
 
 (defn render-this
@@ -188,7 +190,7 @@
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
         text     (cpp/unbox (:* cpp/TTF_Text) text-box)]
 
-    (tap> (::parsl-mesh-box game))
+    (tap> (::world/this game))
     (let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) (::parsl-mesh-box game))
           dummy-vert (cpp/unbox (:* cpp/SDL_Vertex) (::dummy-vert-box game))]
       (cpp/SDL_SetRenderDrawColor renderer 25 25 25 cpp/SDL_ALPHA_OPAQUE)
@@ -229,8 +231,8 @@
 
   debug-tap
 
-  (let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) debug-tap)]
-    (.-num_vertices parsl-mesh))
+  (doseq [fact (o/query-all debug-tap)]
+    (println fact))
 
   (inject-facts!
    [:root {::put-on-conveyor-belt true}])
