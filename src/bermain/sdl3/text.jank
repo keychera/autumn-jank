@@ -2,9 +2,7 @@
   (:include
    "SDL3_ttf/SDL_ttf.h")
   (:require
-   [bermain.engine.world :as world]
-   [bermain.sdl3.error :refer [must-be-some must-be-true]]
-   [bermain.sdl3.time :as time]))
+   [bermain.sdl3.error :refer [must-be-some must-be-true]]))
 
 ;; resource
 ;; https://github.com/libsdl-org/SDL_ttf/blob/main/examples/showfps.c

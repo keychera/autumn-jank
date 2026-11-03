@@ -42,7 +42,7 @@ int jank_sdl_run(int argc, char *argv[]) {
                             :sdl-renderer-box (cpp/box sdl-renderer)
                             :sdl-window-box   (cpp/box sdl-window)
                             :kb-state-box     (cpp/box kb-state))]
-    (cpp/SDL_SetWindowPosition sdl-window 1400 700)
+    (cpp/SDL_SetWindowPosition sdl-window cpp/SDL_WINDOWPOS_CENTERED cpp/SDL_WINDOWPOS_CENTERED)
     (cpp/SDL_SetWindowAlwaysOnTop sdl-window true)
     (cpp/SDL_ShowWindow sdl-window)
     (cpp/SDL_SetRenderVSync sdl-renderer 1)
