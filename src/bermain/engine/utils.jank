@@ -11,3 +11,7 @@
   "o/query-all with assumption that it only match either one or zero match"
   [odoyle-session rule-name]
   (first (o/query-all odoyle-session rule-name)))
+
+(defn retract-many
+  [odoyle-session id & attrs]
+  (reduce (fn [o attr] (o/retract o id attr)) odoyle-session attrs))
