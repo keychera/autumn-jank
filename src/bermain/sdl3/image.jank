@@ -3,7 +3,6 @@
    "SDL3/SDL.h"
    "SDL3_image/SDL_image.h")
   (:require
-   [bermain.engine.fact-queue :refer [queue-new-fact!]]
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.sdl3.error :refer [must-be-some]]
@@ -25,13 +24,13 @@
      (let [previous-texture (get @textures-atom esse-id)]
        (when previous-texture
          (destroy-texture previous-texture))
-       (future
-         (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-               texture  (doto (must-be-some (cpp/IMG_LoadTexture renderer image-path))
-                          (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
-           (swap! textures-atom assoc esse-id (cpp/box texture))
-           (queue-new-fact! [esse-id ::loaded? true]))))
-     (s-> session (o/retract esse-id ::image-path))]}))
+       (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+             texture  (doto (must-be-some (cpp/IMG_LoadTexture renderer image-path))
+                        (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
+         (swap! textures-atom assoc esse-id (cpp/box texture)))
+       (s-> session
+            (o/retract esse-id ::image-path)
+            (o/insert esse-id ::loaded? true)))]}))
 
 (defn init [game]
   (world/establish game rules))
