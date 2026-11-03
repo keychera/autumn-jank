@@ -2,6 +2,7 @@
   (:include
    "SDL3/SDL.h"
    "SDL3_ttf/SDL_ttf.h"
+   "extra.hpp"
    "choreograph/Choreograph.h"
    "choreograph/Easing.h")
   (:require
@@ -30,6 +31,43 @@
 
 (def deposit-line 530.0)
 
+;; https://prideout.net/blog/par_streamlines/#basic-usage
+(cpp/raw
+ "parsl_position vertices[] = {
+    {50, 150}, {200, 100}, {550, 200},
+    {400, 200}, {400, 100}
+};
+  
+  uint16_t spine_lengths[] = { 3, 2 };
+
+  parsl_context* create_sl_context(int thickness) {
+    parsl_context* sl_context = parsl_create_context({ .thickness = thickness });
+    return sl_context;
+}")
+
+(declare rules world-init)
+(defn init [game]
+  (let [sl-context (cpp/create_sl_context 5)
+        dummy-vert (cpp/make_dummy_SDL_Vertices)
+        parsl-mesh (cpp/parsl_mesh_from_lines
+                    sl-context
+                    (cpp/parsl_spine_list
+                     #_num_vertices 5
+                     #_num_spines 2
+                     #_vertices cpp/vertices
+                     #_spine_lengths cpp/spine_lengths
+                     #_closed false))]
+    (-> (assoc game
+               ::dummy-vert-box (cpp/box dummy-vert)
+               ::parsl-mesh-box (cpp/box parsl-mesh)
+               ::sl-context-box (cpp/box sl-context))
+        (world/establish rules world-init))))
+
+(defn clean! [{:keys [::sl-context-box]}]
+  (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
+    (cpp/parsl_destroy_context sl-context)))
+
+
 (defn world-init [world _game]
   (-> (reduce-kv
        (fn [world esse-id image-path]
@@ -54,6 +92,7 @@
                           ::esse/vec2-box (box-vec2 160.0 335.0)
                           ::potion-state ::on-conveyor
                           ::kind ::potion})))
+
 
 (def rules
   (o/ruleset
@@ -130,8 +169,6 @@
            (cpp/delete vec2)
            (s-> session (utils/retract-many esse-id ::image/use ::anime-box ::anime-time ::esse/vec2-box)))))]}))
 
-(defn init [game]
-  (world/establish game rules world-init))
 
 (defn render-this
   [^(:* cpp/SDL_Renderer) sdl-renderer
@@ -150,6 +187,16 @@
     :as game}]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
         text     (cpp/unbox (:* cpp/TTF_Text) text-box)]
+
+    (tap> (::parsl-mesh-box game))
+    (let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) (::parsl-mesh-box game))
+          dummy-vert (cpp/unbox (:* cpp/SDL_Vertex) (::dummy-vert-box game))]
+      (cpp/SDL_SetRenderDrawColor renderer 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+      (let [vertices (cpp/parsl_mesh_to_SDL_Vertices parsl-mesh)
+            indices  (cpp/parsl_mesh_to_indices parsl-mesh)]
+        (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))
+
+      (cpp/SDL_RenderGeometry renderer cpp/nullptr dummy-vert 3 cpp/nullptr 0))
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
@@ -181,6 +228,9 @@
   (require '[bermain.engine.world-mutator :refer [inject-facts! debug-tap]])
 
   debug-tap
+
+  (let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) debug-tap)]
+    (.-num_vertices parsl-mesh))
 
   (inject-facts!
    [:root {::put-on-conveyor-belt true}])

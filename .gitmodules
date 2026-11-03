@@ -1,3 +1,6 @@
 [submodule "third-party/choreograph"]
 	path = third-party/choreograph
 	url = https://github.com/mardy/Choreograph
+[submodule "third-party/par"]
+	path = third-party/par
+	url = https://github.com/prideout/par

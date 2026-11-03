@@ -44,6 +44,7 @@
 
 (defn clean! [game]
   (doto game
+    (potion-factory/clean!)
     (image/clean!)
     (text/clean!)
     (audio/clean!)

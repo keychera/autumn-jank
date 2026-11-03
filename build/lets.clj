@@ -129,7 +129,8 @@
   (log "setting up jank pseudo deps.edn project" args)
   (let [jedn (->jank-deps-edn @deps-basis)
         jcmd (jank-command jedn "run-main" {:main-module (get-main-module @deps-basis)
-                                            :extra ["--" args]})]
+                                            :extra ["-DPAR_STREAMLINES_IMPLEMENTATION"
+                                                    "--" args]})]
     (log jcmd)
     (b/process {:command-args jcmd})))
 
@@ -137,7 +138,8 @@
   [{:keys [args]}]
   (log "setting up jank pseudo deps.edn project" args)
   (let [jedn (->jank-deps-edn @repl-dev-basis)
-        jcmd (jank-command jedn "repl" {:main-module (get-main-module @repl-dev-basis)})]
+        jcmd (jank-command jedn "repl" {:main-module (get-main-module @repl-dev-basis)
+                                        :extra ["-DPAR_STREAMLINES_IMPLEMENTATION"]})]
     (log jcmd)
     (b/process {:command-args jcmd})))
 
@@ -146,7 +148,9 @@
   (let [jedn (->jank-deps-edn @deps-basis)
         jout (-> @deps-basis :jank :compile-out)
         jcmd (jank-command jedn "compile" {:main-module (get-main-module @deps-basis)
-                                           :extra ["-DSDL_MAIN_HANDLED" "--name" jout "-O3"]})]
+                                           :extra ["-DPAR_STREAMLINES_IMPLEMENTATION"
+                                                   "-DSDL_MAIN_HANDLED"
+                                                   "--name" jout "-O3"]})]
     (log jcmd)
     (b/process (cond-> {:command-args jcmd}
                  (fs/windows?) (assoc :env {"JANK_EXTRA_FLAGS" "-Wl,-subsystem,windows"})))
