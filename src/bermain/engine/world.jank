@@ -23,12 +23,6 @@
 (defn ask-many [game rule-name]
   (o/query-all (::this game) rule-name))
 
-(defn esse
-  "insert an esse given the facts in the shape of maps of attr->value.
-   this fn is merely sugar, spice, and everything nice"
-  [world esse-id facts]
-  (o/insert world esse-id facts))
-
 ;; engine
 (defn init [{:keys [::rules ::init-fns] :as game}]
   (let [world  (reduce o/add-rule (o/->session) rules)
@@ -37,7 +31,3 @@
 
 (defn tick [game]
   (update game ::this o/fire-rules))
-
-
-;; just so lsp pick it up
-::pos2d #_{:x 0 :y 0}

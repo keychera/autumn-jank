@@ -7,29 +7,14 @@
   (:require
    [bermain.engine.utils :as utils :refer [s->]]
    [bermain.engine.world :as world]
+   [bermain.esse :as esse :refer [box-vec2]]
    [bermain.sdl3.image :as image]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
 
 (cpp/raw
- "// from choreograph samples
-  struct vec2 {
-    vec2(double x = 0.0f, double y = 0.0f) : x(x), y(y) {}
-
-    vec2 &operator+=(const vec2 &o) {
-        *this = *this + o;
-        return *this;
-    }
-    vec2 operator+(const vec2 &o) const { return {x + o.x, y + o.y}; }
-    vec2 operator-(const vec2 &o) const { return {x - o.x, y - o.y}; }
-    vec2 operator*(double s) const { return {x * s, y * s}; }
-    vec2 operator*(const vec2 &o) const { return {x * o.x, y * o.y}; }
-
-    double x, y;
-};
-  
-  using namespace choreograph;
+ "using namespace choreograph;
   
   template <typename T, typename... Args>
   void thenHold(Sequence<T>& sequence, Args&&... args) {
@@ -56,15 +41,19 @@
               :potion1NG-img "res/images/potion1NG.PNG"
               :potion2NG-img "res/images/potion2NG.PNG"})
       (o/insert :carmine {::image/use :carmine-img
-                          ::world/pos2d {:x 30.0 :y 50.0}})
+                          ::esse/vec2-box (box-vec2 30.0 50.0)
+                          ::layer 0})
       (o/insert :conveyor {::image/use :conveyor-img
-                           ::world/pos2d {:x 0.0 :y 320.0}})
+                           ::esse/vec2-box (box-vec2 0.0 320.0)
+                           ::layer 0})
       (o/insert :potion1 {::image/use :potion1-img
-                          ::world/pos2d {:x 30.0 :y 335.0}
-                          ::potion-state ::on-conveyor})
+                          ::esse/vec2-box (box-vec2 30.0 335.0)
+                          ::potion-state ::on-conveyor
+                          ::kind ::potion})
       (o/insert :potion2 {::image/use :potion2-img
-                          ::world/pos2d {:x 160.0 :y 335.0}
-                          ::potion-state ::on-conveyor})))
+                          ::esse/vec2-box (box-vec2 160.0 335.0)
+                          ::potion-state ::on-conveyor
+                          ::kind ::potion})))
 
 (def rules
   (o/ruleset
@@ -77,27 +66,27 @@
            rand-y  [-20 0 20]]
        (s-> session
             (o/insert potion-id {::image/use (rand-nth potions)
-                                 ::world/pos2d {:x -20.0 :y (+ 335.0 (rand-nth rand-y))}
-                                 ::potion-state ::on-conveyor})))]
-
-    ::pos2d->vec2
-    [:what [esse-id ::world/pos2d pos2d]
-     :then
-     (let [vec2-box (cpp/box (cpp/new cpp/vec2 (:x pos2d) (:y pos2d)))]
-       (s-> session
-            (o/retract esse-id ::world/pos2d)
-            (o/insert esse-id ::vec2-box vec2-box)))]
+                                 ::esse/vec2-box (cpp/box (cpp/new cpp/vec2 -20.0 (+ 335.0 (rand-nth rand-y))))
+                                 ::potion-state ::on-conveyor
+                                 ::kind ::potion})))]
 
     ::images-to-render
     [:what
      [esse-id ::image/use image-id]
-     [esse-id ::vec2-box vec2-box]]
+     [esse-id ::esse/vec2-box vec2-box]
+     [esse-id ::layer layer]]
+
+    ::potions-to-render
+    [:what
+     [esse-id ::image/use image-id]
+     [esse-id ::esse/vec2-box vec2-box]
+     [esse-id ::kind ::potion]]
 
     ::conveyor-belt
     [:what
      [::time/now ::time/delta dt]
      [esse-id ::potion-state ::on-conveyor]
-     [esse-id ::vec2-box vec2-box {:then false}]
+     [esse-id ::esse/vec2-box vec2-box {:then false}]
      :then
      (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
        (if (< (.-x vec2) deposit-line)
@@ -108,7 +97,7 @@
     ::deposit
     [:what
      [esse-id ::potion-state ::deposit]
-     [esse-id ::vec2-box vec2-box {:then false}]
+     [esse-id ::esse/vec2-box vec2-box {:then false}]
      :then
      (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
            deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
@@ -127,7 +116,7 @@
      [::time/now ::time/delta dt]
      [esse-id ::anime-box anime-box]
      [esse-id ::anime-time anime-time {:then false}]
-     [esse-id ::vec2-box vec2-box {:then false}]
+     [esse-id ::esse/vec2-box vec2-box {:then false}]
      :then
      (let [vec2  (cpp/unbox (:* cpp/vec2) vec2-box)
            anime (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) anime-box)]
@@ -139,10 +128,20 @@
          (do
            (cpp/delete anime)
            (cpp/delete vec2)
-           (s-> session (utils/retract-many esse-id ::image/use ::anime-box ::anime-time ::vec2-box)))))]}))
+           (s-> session (utils/retract-many esse-id ::image/use ::anime-box ::anime-time ::esse/vec2-box)))))]}))
 
 (defn init [game]
   (world/establish game rules world-init))
+
+(defn render-this
+  [^(:* cpp/SDL_Renderer) sdl-renderer
+   {:keys [image-id vec2-box]}]
+  (when-let [texture-box (get @image/textures-atom image-id)]
+    (let [vec2     (cpp/unbox (:* cpp/vec2) vec2-box)
+          texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
+          src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
+          dst-rest (cpp/SDL_FRect (.-x vec2) (.-y vec2) (.-w texture) (.-h texture))]
+      (cpp/SDL_RenderTexture sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))
 
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
@@ -150,20 +149,19 @@
     main-scale :main-scale
     :as game}]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-        text     (cpp/unbox (:* cpp/TTF_Text) text-box)
-        images   (->> (world/ask-many game ::images-to-render)
-                      (sort-by (fn [{vec2-box :vec2-box}]
-                                 (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                                   (.-y vec2))) >))]
+        text     (cpp/unbox (:* cpp/TTF_Text) text-box)]
 
-    (doseq [{:keys [image-id] vec2-box :vec2-box} images]
+    (let [images (world/ask-many game ::images-to-render)]
+      (doseq [image images]
+        (render-this sdl-renderer-box image)))
 
-      (when-let [texture-box (get @image/textures-atom image-id)]
-        (let [vec2     (cpp/unbox (:* cpp/vec2) vec2-box)
-              texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
-              src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
-              dst-rest (cpp/SDL_FRect (.-x vec2) (.-y vec2) (.-w texture) (.-h texture))]
-          (cpp/SDL_RenderTexture renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))
+    (let [potions
+          (->> (world/ask-many game ::potions-to-render)
+               (sort-by (fn [{vec2-box :vec2-box}]
+                          (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                            (.-y vec2))) >))]
+      (doseq [potion potions]
+        (render-this sdl-renderer-box potion)))
 
     ;; debug
     (let [mouse-x (cpp/float)
