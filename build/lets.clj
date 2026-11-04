@@ -124,15 +124,26 @@
   (b/delete {:path @target-dir}))
 
 (defn jank
-  {:org.babashka/cli {:exec-args {:args nil}}}
-  [{:keys [args]}]
+  {:org.babashka/cli {:exec-args {:profile? false
+                                  :args nil}
+                      :coerce {:profile? :bool}}}
+  [{:keys [args profile?]}]
   (log "setting up jank pseudo deps.edn project" args)
   (let [jedn (->jank-deps-edn @deps-basis)
-        jcmd (jank-command jedn "run-main" {:main-module (get-main-module @deps-basis)
-                                            :extra ["-DPAR_STREAMLINES_IMPLEMENTATION"
-                                                    "--" args]})]
+        jcmd (jank-command
+              jedn "run-main"
+              {:main-module (get-main-module @deps-basis)
+               :extra
+               (flatten
+                [(when profile? ["--profile"])
+                 "-DPAR_STREAMLINES_IMPLEMENTATION"
+                 "--" args])})]
     (log jcmd)
-    (b/process {:command-args jcmd})))
+    (b/process
+     (let [JANK_EXTRA_FLAGS (str/join (cond-> []
+                                        profile? (conj "-gcodeview")))]
+       {:env {"JANK_EXTRA_FLAGS" JANK_EXTRA_FLAGS}
+        :command-args jcmd}))))
 
 (defn repl-dev
   [{:keys [args]}]
@@ -144,7 +155,10 @@
     (b/process {:command-args jcmd})))
 
 (defn compile-jank
-  [{}]
+  {:org.babashka/cli {:exec-args {:profile? false}
+                      :coerce {:profile? :bool}}}
+  [{:keys [profile?] :as args}]
+  (println "compile-jank with" args)
   (let [jedn (->jank-deps-edn @deps-basis)
         jout (-> @deps-basis :jank :compile-out)
         jcmd (jank-command jedn "compile" {:main-module (get-main-module @deps-basis)
@@ -152,8 +166,17 @@
                                                    "-DSDL_MAIN_HANDLED"
                                                    "--name" jout "-O3"]})]
     (log jcmd)
-    (b/process (cond-> {:command-args jcmd}
-                 (fs/windows?) (assoc :env {"JANK_EXTRA_FLAGS" "-Wl,-subsystem,windows"})))
+    (let [JANK_EXTRA_FLAGS
+          (str/join " "
+                    (cond-> []
+                      ;; https://discourse.llvm.org/t/generate-coff-symbols-even-when-generating-pdb/80488/2
+                      profile? (conj "-g -gcodeview"
+                                     "-fuse-ld=lld" 
+                                     "-Wl,/debug:full"
+                                     "-Wl,/pdbaltpath:%_PDB%")
+                      (fs/windows?) (conj "-Wl,-subsystem,windows")))]
+      (b/process {:env {"JANK_EXTRA_FLAGS" JANK_EXTRA_FLAGS}
+                  :command-args jcmd}))
     (when (fs/windows?)
       (gather-shared-libs))))
 
