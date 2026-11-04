@@ -1,7 +1,4 @@
 (ns bermain.engine.anime
-  (:include
-   "choreograph/Choreograph.h"
-   "choreograph/Easing.h")
   (:require
    [bermain.sdl3.time :as time]))
 

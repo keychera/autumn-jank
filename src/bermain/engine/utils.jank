@@ -18,5 +18,5 @@
     odoyle-session))
 
 (defn retract-many
-  [odoyle-session id & attrs]
+  [odoyle-session id attrs]
   (reduce (fn [o attr] (safe-retract o id attr)) odoyle-session attrs))

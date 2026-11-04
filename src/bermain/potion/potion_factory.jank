@@ -16,41 +16,9 @@
    [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
 
-;; from choreograph samples
-(cpp/raw
- "struct vec2 {
-    vec2(double x = 0.0f, double y = 0.0f) : x(x), y(y) {}
-
-    vec2 &operator+=(const vec2 &o) {
-        *this = *this + o;
-        return *this;
-    }
-    vec2 operator+(const vec2 &o) const { return {x + o.x, y + o.y}; }
-    vec2 operator-(const vec2 &o) const { return {x - o.x, y - o.y}; }
-    vec2 operator*(double s) const { return {x * s, y * s}; }
-    vec2 operator*(const vec2 &o) const { return {x * o.x, y * o.y}; }
-
-    double x, y;
-};")
-
 #_[float float]
 (defn box-vec2 [x y] (cpp/box (cpp/new cpp/vec2 x y)))
-#_::vec2-box
-
-(cpp/raw
- "using namespace choreograph;
-  
-  template <typename T, typename... Args>
-  void thenHold(Sequence<T>& sequence, Args&&... args) {
-      sequence.template then<Hold>(std::forward<Args>(args)...);
-  }
-  
-  template <typename T, typename... Args>
-  void thenRampTo(Sequence<T>& sequence, Args&&... args) {
-      sequence.template then<RampTo>(std::forward<Args>(args)...);
-  }
-  
-  using CSI = Sequence<int>;")
+#_::esse/vec2-box
 
 (def deposit-line 530.0)
 
@@ -94,7 +62,7 @@
   (let [pressed? (::input/pressed? game)]
     (cond-> game
       (::input/space pressed?)
-      (world/new-fact :root {::put-on-conveyor-belt true}))))
+      (world/insert-fact :root {::put-on-conveyor-belt true}))))
 
 (defn world-init [world _game]
   (-> (reduce-kv
@@ -166,8 +134,8 @@
                                            (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
                  (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
                (-> game
-                   (world/retract-attrs esse-id [::potion-state])
-                   (world/new-fact esse-id {::Sequence-box (cpp/box deposit-anime)})))))))]
+                   (world/retract-many esse-id [::potion-state])
+                   (world/insert-fact esse-id {::Sequence-box (cpp/box deposit-anime)})))))))]
 
     ::vec2+Sequence
     [:what
@@ -186,7 +154,7 @@
                (cpp/= (.-y vec2) (.-y vec2'))
                (assoc-in game [esse-id ::time] (+ anime-time dt)))
              (-> game
-                 (world/retract-attrs esse-id [::image/use ::kind ::Sequence-box ::esse/vec2-box])
+                 (world/retract-many esse-id [::image/use ::kind ::Sequence-box ::esse/vec2-box])
                  (anime/end-episode esse-id))))))]}))
 
 (defn render-this

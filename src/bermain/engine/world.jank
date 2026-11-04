@@ -11,17 +11,15 @@
      true (update ::rules (fnil into []) rules)
      init-fn (update ::init-fns (fnil conj []) init-fn))))
 
-(defn new-fact
+(defn insert-fact
   ([game fact]
    (update game ::this o/insert fact))
   ([game esse-id attr->val]
    (update game ::this o/insert esse-id attr->val)))
 
-(defn retract-attrs
+(defn retract-many
   [game esse-id attrs]
-  (reduce (fn [game attr]
-            (update game ::this utils/safe-retract esse-id attr))
-          game attrs))
+  (update game ::this utils/retract-many esse-id attrs))
 
 (defn ask-one [game rule-name]
   (utils/query-one (::this game) rule-name))
