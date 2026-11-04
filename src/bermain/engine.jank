@@ -31,19 +31,15 @@
       (#_dev-only world-mutator/flow)
 
       (sdl3-input/poll-events)
-      (potion-factory/route-inputs)
       (fact-queue/flow)
       (world/tick)
       (time/flow)
       (audio/flow)
-      (anime/flow)))
+      (anime/flow)
+      (potion-factory/flow)))
 
 (defn render! [game]
-  (image/render! game)
-
-  (potion-factory/render! game)
-
-  (text/render! game))
+  (potion-factory/render! game))
 
 (defn clean! [game]
   (doto game

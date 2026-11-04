@@ -24,12 +24,12 @@
 
 ;; https://prideout.net/blog/par_streamlines/#basic-usage
 (cpp/raw
- "parsl_position vertices[] = {
-    {50, 150}, {200, 100}, {550, 200},
+ "parsl_position square_vertices[] = {
+    {50, 150}, {200, 100},
     {400, 200}, {400, 100}
 };
   
-  uint16_t spine_lengths[] = { 3, 2 };
+  uint16_t spine_lengths[] = { 4 };
 
   parsl_context* create_sl_context(int thickness) {
     parsl_context* sl_context = parsl_create_context({ .thickness = thickness });
@@ -37,32 +37,34 @@
 }")
 
 (declare rules world-init)
+
 (defn init [game]
-  (let [sl-context (cpp/create_sl_context 5)
-        dummy-vert (cpp/make_dummy_SDL_Vertices)
-        parsl-mesh (cpp/parsl_mesh_from_lines
-                    sl-context
-                    (cpp/parsl_spine_list
-                     #_num_vertices 5
-                     #_num_spines 2
-                     #_vertices cpp/vertices
-                     #_spine_lengths cpp/spine_lengths
-                     #_closed false))]
-    (-> (assoc game
-               ::dummy-vert-box (cpp/box dummy-vert)
-               ::parsl-mesh-box (cpp/box parsl-mesh)
-               ::sl-context-box (cpp/box sl-context))
+  (let [sl-context (cpp/create_sl_context 5)]
+    (-> (assoc game ::sl-context-box (cpp/box sl-context))
         (world/establish rules world-init))))
 
 (defn clean! [{:keys [::sl-context-box]}]
   (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
     (cpp/parsl_destroy_context sl-context)))
 
-(defn route-inputs [game]
-  (let [pressed? (::input/pressed? game)]
-    (cond-> game
-      (::input/space pressed?)
-      (world/insert-fact :root {::put-on-conveyor-belt true}))))
+(defn route-inputs [{pressed? ::input/pressed? :as game}]
+  (cond-> game
+    (::input/space pressed?)
+    (world/insert-fact :root {::put-on-conveyor-belt true})))
+
+(defn flow [{main-scale :main-scale :as game}]
+  (let [mouse-x (cpp/float)
+        mouse-y (cpp/float)]
+    (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
+    (let [mouse-x (/ mouse-x main-scale)
+          mouse-y (/ mouse-y main-scale)]
+      (-> (assoc game :mouse-x mouse-x :mouse-y mouse-y)
+          (world/insert-fact :root {::mouse {:mouse-x mouse-x :mouse-y mouse-y}})
+          (route-inputs)))))
+
+(defn inside? [px py area-x area-y area-w area-h]
+  (and (< area-x px (+ area-x area-w))
+       (< area-y py (+ area-y area-h))))
 
 (defn world-init [world _game]
   (-> (reduce-kv
@@ -114,7 +116,31 @@
     [:what
      [esse-id ::image/use image-id]
      [esse-id ::esse/vec2-box vec2-box]
-     [esse-id ::kind ::potion]]
+     [esse-id ::kind ::potion]
+     [image-id ::image/metadata metadata]
+     :then-finally
+     (let [all-potions (o/query-all session ::potions-to-render)]
+       (s-> session (o/insert :root ::all-potions all-potions)))]
+
+    ::potions-under-mouse
+    [:what
+     [:root ::all-potions all-potions]
+     [:root ::mouse mouse]
+     :then
+     (let [{:keys [mouse-x mouse-y]} mouse
+           mouse-xf (comp
+                     (map (fn [{:keys [vec2-box]
+                                {:keys [width height]} :metadata}]
+                            (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                              {:x (.-x vec2) :y (.-y vec2) :w width :h height})))
+                     (filter (fn [{:keys [x y w h]}]
+                               (inside? mouse-x mouse-y x y w h)))
+                     (take 1))
+           hit-by-mouse (first (into [] mouse-xf all-potions))]
+       (s-> session (o/insert :root ::hit-by-mouse hit-by-mouse)))]
+
+    ::hit-by-mouse
+    [:what [:root ::hit-by-mouse hit-by-mouse]]
 
     ::conveyor-belt
     [:what
@@ -169,52 +195,68 @@
 
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
+    sl-context-box ::sl-context-box
     text-box ::text/text
-    main-scale :main-scale
     :as game}]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-        text     (cpp/unbox (:* cpp/TTF_Text) text-box)]
+  (let [renderer     (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+        text         (cpp/unbox (:* cpp/TTF_Text) text-box)
+        sl-context   (cpp/unbox (:* cpp/parsl_context) sl-context-box)
+        hit-by-mouse (:hit-by-mouse (world/ask-one game ::hit-by-mouse))
+        potions (->> (world/ask-many game ::potions-to-render)
+                     (sort-by (fn [{vec2-box :vec2-box}]
+                                (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                                  (.-y vec2))) >))]
 
     (tap> (::world/this game))
-    #_(let [parsl-mesh (cpp/unbox (:* cpp/parsl_mesh) (::parsl-mesh-box game))
-            dummy-vert (cpp/unbox (:* cpp/SDL_Vertex) (::dummy-vert-box game))]
-        (cpp/SDL_SetRenderDrawColor renderer 25 25 25 cpp/SDL_ALPHA_OPAQUE)
-        (let [vertices (cpp/parsl_mesh_to_SDL_Vertices parsl-mesh)
-              indices  (cpp/parsl_mesh_to_indices parsl-mesh)]
-          (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))
-
-        (cpp/SDL_RenderGeometry renderer cpp/nullptr dummy-vert 3 cpp/nullptr 0))
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
         (render-this sdl-renderer-box image)))
 
-    (let [potions
-          (->> (world/ask-many game ::potions-to-render)
-               (sort-by (fn [{vec2-box :vec2-box}]
-                          (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                            (.-y vec2))) >))]
-      (doseq [potion potions]
-        (render-this sdl-renderer-box potion))
+    (doseq [potion potions]
+      (render-this sdl-renderer-box potion))
 
-      ;; debug
-      (let [debug-fps (::time/debug-fps game 0)
-            num-of-potions (count potions)
-            mouse-x (cpp/float)
-            mouse-y (cpp/float)]
-        (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
-        (doto text
-          (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
-          (cpp/TTF_SetTextString (str
-                                  debug-fps "\n"
-                                  (format "{:.2f}" (/ mouse-x main-scale))
-                                  ", "
-                                  (format "{:.2f}" (/ mouse-y main-scale))
-                                  "\npotions:" num-of-potions) 0)
-          (cpp/TTF_DrawRendererText 16.0 8.0))
+    (when hit-by-mouse ;; draw box around it
+      (let [{:keys [x y w h]} hit-by-mouse
+            _ (do
+                (cpp/= (.-x (cpp/aget cpp/square_vertices 0)) x)
+                (cpp/= (.-y (cpp/aget cpp/square_vertices 0)) y)
+                (cpp/= (.-x (cpp/aget cpp/square_vertices 1)) (+ x w))
+                (cpp/= (.-y (cpp/aget cpp/square_vertices 1)) y)
+                (cpp/= (.-x (cpp/aget cpp/square_vertices 2)) (+ x w))
+                (cpp/= (.-y (cpp/aget cpp/square_vertices 2)) (+ y h))
+                (cpp/= (.-x (cpp/aget cpp/square_vertices 3)) x)
+                (cpp/= (.-y (cpp/aget cpp/square_vertices 3)) (+ y h)))
+            mesh (cpp/parsl_mesh_from_lines
+                  sl-context
+                  (cpp/parsl_spine_list
+                   #_num_vertices 4
+                   #_num_spines 1
+                   #_vertices cpp/square_vertices
+                   #_spine_lengths cpp/spine_lengths
+                   #_closed true))]
+        (cpp/SDL_SetRenderDrawColor renderer 225 215 25 cpp/SDL_ALPHA_OPAQUE)
+        (let [vertices (cpp/parsl_mesh_to_SDL_Vertices mesh)
+              indices  (cpp/parsl_mesh_to_indices mesh)]
+          (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))))
 
-        (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
-        (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))))
+    ;; debug
+    (let [{:keys [mouse-x mouse-y]} game
+          debug-fps (::time/debug-fps game 0)
+          num-of-potions (count potions)]
+      (doto text
+        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (cpp/TTF_SetTextString (str
+                                debug-fps "\n"
+                                "hit: " hit-by-mouse "\n"
+                                (format "{:.2f}" mouse-x)
+                                ", "
+                                (format "{:.2f}" mouse-y)
+                                "\npotions:" num-of-potions) 0)
+        (cpp/TTF_DrawRendererText 16.0 8.0))
+
+      (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
+      (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0))))
 
 (comment
   (require '[bermain.engine.world-mutator :refer [inject-facts! debug-tap]])

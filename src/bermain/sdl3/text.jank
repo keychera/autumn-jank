@@ -20,8 +20,6 @@
            ::font   (cpp/box font)
            ::text   (cpp/box text))))
 
-(defn render! [_game])
-
 (defn clean! [{:keys [::text ::engine ::font]}]
   (when text (cpp/TTF_DestroyText (cpp/unbox (:* cpp/TTF_Text) text)))
   (when engine (cpp/TTF_DestroyRendererTextEngine (cpp/unbox (:* cpp/TTF_TextEngine) engine)))
