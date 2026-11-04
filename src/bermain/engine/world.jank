@@ -17,6 +17,12 @@
   ([game esse-id attr->val]
    (update game ::this o/insert esse-id attr->val)))
 
+(defn retract-attrs
+  [game esse-id attrs]
+  (reduce (fn [game attr]
+            (update game ::this utils/safe-retract esse-id attr))
+          game attrs))
+
 (defn ask-one [game rule-name]
   (utils/query-one (::this game) rule-name))
 

@@ -1,0 +1,34 @@
+(ns bermain.engine.anime
+  (:include
+   "choreograph/Choreograph.h"
+   "choreograph/Easing.h")
+  (:require
+   [bermain.sdl3.time :as time]))
+
+(defonce anime-db (atom {}))
+
+(defn play-episode!
+  "play an episode of anime-fn (fn [game dt] game) that will be run by anime/flow
+   anime-fn MUST return game or well you lose the game."
+  [esse-id anime-fn]
+  (swap! anime-db assoc-in [esse-id ::anime-fn] anime-fn))
+
+(defn end-episode
+  "end-episode of esse-id anime given a game.
+   unlike play-episode! this is only flag the anime to end during anime/flow"
+  [game esse-id]
+  (assoc game esse-id ::ending))
+
+(defn flow
+  [{::time/keys [delta] :as game}]
+  (let [animes @anime-db]
+    (reduce-kv
+     (fn [game' esse-id {:keys [::anime-fn]}]
+       (if (= (get game' esse-id) ::ending)
+         (do (swap! anime-db dissoc esse-id)
+             (dissoc game' esse-id))
+         (anime-fn game' delta)))
+     game animes)))
+
+(defn clean! [_game]
+  (reset! anime-db {}))

@@ -10,7 +10,8 @@
    [bermain.sdl3.sdl3 :as sdl3]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
-   [bermain.sdl3.time :as time]))
+   [bermain.sdl3.time :as time]
+   [bermain.engine.anime :as anime]))
 
 (defn init [game]
   (-> game
@@ -34,7 +35,8 @@
       (fact-queue/flow)
       (world/tick)
       (time/flow)
-      (audio/flow)))
+      (audio/flow)
+      (anime/flow)))
 
 (defn render! [game]
   (image/render! game)
@@ -46,6 +48,7 @@
 (defn clean! [game]
   (doto game
     (potion-factory/clean!)
+    (anime/clean!)
     (image/clean!)
     (text/clean!)
     (audio/clean!)

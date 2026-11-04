@@ -6,6 +6,7 @@
    "choreograph/Choreograph.h"
    "choreograph/Easing.h")
   (:require
+   [bermain.engine.anime :as anime]
    [bermain.engine.utils :as utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
@@ -33,7 +34,7 @@
 };")
 
 #_[float float]
-(defn box-vec2 [x y] (cpp/box (cpp/new cpp/vec2 x y))) 
+(defn box-vec2 [x y] (cpp/box (cpp/new cpp/vec2 x y)))
 #_::vec2-box
 
 (cpp/raw
@@ -120,7 +121,6 @@
                           ::potion-state ::on-conveyor
                           ::kind ::potion})))
 
-
 (def rules
   (o/ruleset
    {::put-on-conveyor-belt
@@ -150,54 +150,44 @@
 
     ::conveyor-belt
     [:what
-     [::time/now ::time/delta dt]
      [esse-id ::potion-state ::on-conveyor]
-     [esse-id ::esse/vec2-box vec2-box {:then false}]
+     [esse-id ::esse/vec2-box vec2-box]
      :then
-     (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-       (if (< (.-x vec2) deposit-line)
-         (cpp/+= (.-x vec2) (* 74.0 dt))
-         (s-> session
-              (o/insert esse-id ::potion-state ::deposit))))]
+     (anime/play-episode! esse-id
+       (fn [game dt]
+         (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+           (if (< (.-x vec2) deposit-line)
+             (do (cpp/+= (.-x vec2) (* 74.0 dt)) game)
+             (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
+                   deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
+                   rand-val      [-50 -40 30 0 30 40 50]]
+               (doto (cpp/* deposit-anime)
+                 (cpp/thenRampTo (cpp/vec2 (float (+ 630 (rand-nth rand-val)))
+                                           (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
+                 (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
+               (-> game
+                   (world/retract-attrs esse-id [::potion-state])
+                   (world/new-fact esse-id {::Sequence-box (cpp/box deposit-anime)})))))))]
 
-    ::deposit
+    ::vec2+Sequence
     [:what
-     [esse-id ::potion-state ::deposit]
-     [esse-id ::esse/vec2-box vec2-box {:then false}]
+     [esse-id ::kind ::potion]
+     [esse-id ::Sequence-box Sequence-box]
+     [esse-id ::esse/vec2-box vec2-box]
      :then
-     (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
-           deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
-           rand-val      [-50 -40 30 0 30 40 50]]
-       (doto (cpp/* deposit-anime)
-         (cpp/thenRampTo (cpp/vec2 (float (+ 630 (rand-nth rand-val)))
-                                   (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
-         (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
-       (s-> session
-            (o/retract esse-id ::potion-state)
-            (o/insert esse-id {::anime-time 0.0
-                               ::anime-box (cpp/box deposit-anime)})))]
-
-    ::deposit-anime
-    [:what
-     [::time/now ::time/delta dt]
-     [esse-id ::anime-box anime-box]
-     [esse-id ::anime-time anime-time {:then false}]
-     [esse-id ::esse/vec2-box vec2-box {:then false}]
-     :then
-     (let [vec2  (cpp/unbox (:* cpp/vec2) vec2-box)
-           anime (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) anime-box)]
-       (if (< anime-time (.getDuration (cpp/* anime)))
-         (let [vec2' (.getValue (cpp/* anime) anime-time)]
-           (cpp/= (.-x vec2) (.-x vec2'))
-           (cpp/= (.-y vec2) (.-y vec2'))
-           (s-> session (o/insert esse-id ::anime-time (+ anime-time dt))))
-         (do
-           (cpp/delete anime)
-           (cpp/delete vec2)
-           (s->  (utils/retract-many
-                  session esse-id
-                  ::anime-box ::anime-time ::kind ::esse/vec2-box ::image/use)))))]}))
-
+     (anime/play-episode! esse-id
+       (fn [game dt]
+         (let [vec2       (cpp/unbox (:* cpp/vec2) vec2-box)
+               choreo-seq (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) Sequence-box)
+               anime-time (get-in game [esse-id ::time] 0.0)]
+           (if (< anime-time (.getDuration (cpp/* choreo-seq)))
+             (let [vec2' (.getValue (cpp/* choreo-seq) anime-time)]
+               (cpp/= (.-x vec2) (.-x vec2'))
+               (cpp/= (.-y vec2) (.-y vec2'))
+               (assoc-in game [esse-id ::time] (+ anime-time dt)))
+             (-> game
+                 (world/retract-attrs esse-id [::image/use ::kind ::Sequence-box ::esse/vec2-box])
+                 (anime/end-episode esse-id))))))]}))
 
 (defn render-this
   [^(:* cpp/SDL_Renderer) sdl-renderer
@@ -233,14 +223,14 @@
 
     (let [potions
           (->> (world/ask-many game ::potions-to-render)
-               #_(sort-by (fn [{vec2-box :vec2-box}]
-                            (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                              (.-y vec2))) >))]
+               (sort-by (fn [{vec2-box :vec2-box}]
+                          (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                            (.-y vec2))) >))]
       (doseq [potion potions]
         (render-this sdl-renderer-box potion))
 
       ;; debug
-      (let [{:keys [debug-fps]} (world/ask-one game ::time/debug-fps)
+      (let [debug-fps (::time/debug-fps game 0)
             num-of-potions (count potions)
             mouse-x (cpp/float)
             mouse-y (cpp/float)]
@@ -263,6 +253,7 @@
 
   debug-tap
 
+  (count (o/query-all debug-tap))
   (doseq [fact (o/query-all debug-tap)]
     (println fact))
 
