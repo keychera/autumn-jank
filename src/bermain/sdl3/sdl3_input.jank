@@ -1,6 +1,4 @@
-(ns bermain.sdl3.sdl3-input
-  (:include
-   "SDL3/SDL.h"))
+(ns bermain.sdl3.sdl3-input)
 
 (def keyname->scancode
   {::esc   cpp/SDL_SCANCODE_ESCAPE
@@ -30,6 +28,12 @@
                 (-> game ::pressed? ::esc)
                 (cpp/== event-type cpp/SDL_EVENT_WINDOW_CLOSE_REQUESTED))
             (recur (assoc game' :end? true))
+
+            (cpp/== event-type cpp/SDL_EVENT_MOUSE_BUTTON_DOWN)
+            (recur (assoc game' :mouse-down? true))
+
+            (cpp/== event-type cpp/SDL_EVENT_MOUSE_BUTTON_UP)
+            (recur (assoc game' :mouse-down? false))
 
             :else (recur game')))
         (process-input game')))))

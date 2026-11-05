@@ -36,13 +36,6 @@
     return sl_context;
 }")
 
-(declare rules world-init)
-
-(defn init [game]
-  (let [sl-context (cpp/create_sl_context 5)]
-    (-> (assoc game ::sl-context-box (cpp/box sl-context))
-        (world/establish rules world-init))))
-
 (defn clean! [{:keys [::sl-context-box]}]
   (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
     (cpp/parsl_destroy_context sl-context)))
@@ -59,11 +52,11 @@
     (let [mouse-x (/ mouse-x main-scale)
           mouse-y (/ mouse-y main-scale)]
       (-> (assoc game :mouse-x mouse-x :mouse-y mouse-y)
-          (world/insert-fact :root {::mouse {:mouse-x mouse-x :mouse-y mouse-y}})
+          (world/insert-fact :root {::mouse (select-keys game [:mouse-down? :mouse-x :mouse-y])})
           (route-inputs)))))
 
 (defn inside? [px py area-x area-y area-w area-h]
-  (and (< area-x px (+ area-x area-w))
+  (and px py (< area-x px (+ area-x area-w))
        (< area-y py (+ area-y area-h))))
 
 (defn world-init [world _game]
@@ -129,18 +122,40 @@
      :then
      (let [{:keys [mouse-x mouse-y]} mouse
            mouse-xf (comp
-                     (map (fn [{:keys [vec2-box]
+                     (map (fn [{:keys [vec2-box esse-id]
                                 {:keys [width height]} :metadata}]
                             (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                              {:x (.-x vec2) :y (.-y vec2) :w width :h height})))
+                              {:esse-id esse-id :x (.-x vec2) :y (.-y vec2) :w width :h height})))
                      (filter (fn [{:keys [x y w h]}]
                                (inside? mouse-x mouse-y x y w h)))
                      (take 1))
            hit-by-mouse (first (into [] mouse-xf all-potions))]
-       (s-> session (o/insert :root ::hit-by-mouse hit-by-mouse)))]
+       (s-> session
+            (o/insert :root {::hit-by-mouse hit-by-mouse
+                             ::target-esse-id (:esse-id hit-by-mouse)})))]
 
     ::hit-by-mouse
-    [:what [:root ::hit-by-mouse hit-by-mouse]]
+    [:what
+     [:root ::hit-by-mouse hit-by-mouse]]
+
+    ::throw
+    [:what
+     [:root ::mouse mouse]
+     [:root ::target-esse-id esse-id]
+     [esse-id ::potion-state ::on-conveyor]
+     [esse-id ::esse/vec2-box vec2-box]
+     :when (:mouse-down? mouse)
+     :then
+     (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
+           deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
+           rand-val      [-50 -40 30 0 30 40 50]]
+       (doto (cpp/* deposit-anime)
+         (cpp/thenRampTo (cpp/vec2 (float (+ 630 (rand-nth rand-val)))
+                                   (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
+         (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
+       (s-> session
+            (o/retract esse-id ::potion-state)
+            (o/insert esse-id {::Sequence-box (cpp/box deposit-anime)})))]
 
     ::conveyor-belt
     [:what
@@ -182,6 +197,11 @@
              (-> game
                  (world/retract-many esse-id [::image/use ::kind ::Sequence-box ::esse/vec2-box])
                  (anime/end-episode esse-id))))))]}))
+
+(defn init [game]
+  (let [sl-context (cpp/create_sl_context 5)]
+    (-> (assoc game ::sl-context-box (cpp/box sl-context))
+        (world/establish rules world-init))))
 
 (defn render-this
   [^(:* cpp/SDL_Renderer) sdl-renderer
@@ -241,7 +261,7 @@
           (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))))
 
     ;; debug
-    (let [{:keys [mouse-x mouse-y]} game
+    (let [{:keys [mouse-x mouse-y mouse-down?]} game
           debug-fps (::time/debug-fps game 0)
           num-of-potions (count potions)]
       (doto text
@@ -249,6 +269,7 @@
         (cpp/TTF_SetTextString (str
                                 debug-fps "\n"
                                 "hit: " hit-by-mouse "\n"
+                                "mouse-down: " mouse-down? "\n"
                                 (format "{:.2f}" mouse-x)
                                 ", "
                                 (format "{:.2f}" mouse-y)
