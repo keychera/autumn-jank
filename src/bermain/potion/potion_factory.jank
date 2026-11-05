@@ -22,20 +22,6 @@
 
 (def deposit-line 530.0)
 
-;; https://prideout.net/blog/par_streamlines/#basic-usage
-(cpp/raw
- "parsl_position square_vertices[] = {
-    {50, 150}, {200, 100},
-    {400, 200}, {400, 100}
-};
-  
-  uint16_t spine_lengths[] = { 4 };
-
-  parsl_context* create_sl_context(int thickness) {
-    parsl_context* sl_context = parsl_create_context({ .thickness = thickness });
-    return sl_context;
-}")
-
 (defn clean! [{:keys [::sl-context-box]}]
   (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
     (cpp/parsl_destroy_context sl-context)))

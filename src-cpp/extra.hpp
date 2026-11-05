@@ -56,10 +56,13 @@ static std::vector<int> parsl_mesh_to_indices(const parsl_mesh *mesh) {
   return sdl_indices;
 }
 
-static const SDL_Vertex *make_dummy_SDL_Vertices() {
-  static const SDL_Vertex dummy[3] = {
-      {{400.0f, 150.0f}, {255, 0, 0, 255}, {0.0f, 0.0f}},
-      {{200.0f, 450.0f}, {0, 0, 255, 255}, {0.0f, 0.0f}},
-      {{600.0f, 450.0f}, {0, 255, 0, 255}, {0.0f, 0.0f}}};
-  return dummy;
+// https://prideout.net/blog/par_streamlines/#basic-usage
+inline parsl_position square_vertices[] = {
+    {50, 150}, {200, 100}, {400, 200}, {400, 100}};
+
+inline uint16_t spine_lengths[] = {4};
+
+inline parsl_context *create_sl_context(float thickness) {
+  parsl_context *sl_context = parsl_create_context({.thickness = thickness});
+  return sl_context;
 }
