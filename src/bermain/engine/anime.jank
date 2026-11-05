@@ -17,14 +17,15 @@
   (assoc game esse-id ::ending))
 
 (defn flow
-  [{::time/keys [delta] :as game}]
-  (let [animes @anime-db]
+  [{::time/keys [delta speed] :as game}]
+  (let [animes @anime-db
+        dt (* delta speed)]
     (reduce-kv
      (fn [game' esse-id {:keys [::anime-fn]}]
        (if (= (get game' esse-id) ::ending)
          (do (swap! anime-db dissoc esse-id)
              (dissoc game' esse-id))
-         (anime-fn game' delta)))
+         (anime-fn game' dt)))
      game animes)))
 
 (defn clean! [_game]

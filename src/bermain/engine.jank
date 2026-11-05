@@ -2,7 +2,7 @@
   (:require
    [bermain.engine.fact-queue :as fact-queue]
    [bermain.engine.world :as world]
-   [bermain.engine.world-mutator :as world-mutator]
+   [bermain.engine.game-mutator :as game-mutator]
    [bermain.potion.potion-factory :as potion-factory]
    [bermain.sdl3.audio :as audio]
    [bermain.sdl3.error :as error]
@@ -28,7 +28,7 @@
 
 (defn tick [game]
   (-> game
-      (#_dev-only world-mutator/flow)
+      (#_dev-only game-mutator/flow)
 
       (sdl3-input/poll-events)
       (fact-queue/flow)

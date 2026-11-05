@@ -266,7 +266,7 @@
       (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0))))
 
 (comment
-  (require '[bermain.engine.world-mutator :refer [inject-facts! debug-tap]])
+  (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]])
 
   debug-tap
 
@@ -276,5 +276,7 @@
 
   (inject-facts!
    [:root {::put-on-conveyor-belt true}])
+  
+  (assoc-game! ::time/speed 1.0)
 
   :-)

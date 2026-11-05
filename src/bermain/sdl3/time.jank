@@ -11,5 +11,6 @@
       (assoc game' ::one-second 0 ::frame-count 0 ::debug-fps frame-count))))
 
 (defn init [game]
-  (assoc game ::one-second 0 ::frame-count 0))
-
+  (assoc game
+         ::speed 1.0
+         ::one-second 0 ::frame-count 0))
