@@ -89,7 +89,8 @@
     [:what
      [esse-id ::image/use image-id]
      [esse-id ::esse/vec2-box vec2-box]
-     [esse-id ::layer layer]]
+     [esse-id ::layer layer]
+     [image-id ::image/metadata metadata]]
 
     ::potions-to-render
     [:what
@@ -185,8 +186,17 @@
                  (anime/end-episode esse-id))))))]}))
 
 (defn init [game]
+  (anime/play-episode! :potion-periodic
+    (fn [game dt]
+      (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
+        (if (< potion-time 0.5)
+          (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
+          (-> game
+              (world/insert-fact :root {::put-on-conveyor-belt true})
+              (assoc-in [:potion-periodic ::time] 0.0))))))
   (let [sl-context (cpp/create_sl_context 5)]
     (-> (assoc game ::sl-context-box (cpp/box sl-context))
+        (assoc ::time/speed 0.5)
         (world/establish rules world-init))))
 
 (defn render-this
@@ -247,15 +257,13 @@
           (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))))
 
     ;; debug
-    (let [{:keys [mouse-x mouse-y mouse-down?]} game
+    (let [{:keys [mouse-x mouse-y]} game
           debug-fps (::time/debug-fps game 0)
           num-of-potions (count potions)]
       (doto text
         (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
         (cpp/TTF_SetTextString (str
                                 debug-fps "\n"
-                                "hit: " hit-by-mouse "\n"
-                                "mouse-down: " mouse-down? "\n"
                                 (format "{:.2f}" mouse-x)
                                 ", "
                                 (format "{:.2f}" mouse-y)
@@ -276,7 +284,7 @@
 
   (inject-facts!
    [:root {::put-on-conveyor-belt true}])
-  
-  (assoc-game! ::time/speed 1.0)
+
+  (assoc-game! ::time/speed 0.0)
 
   :-)
