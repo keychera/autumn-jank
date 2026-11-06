@@ -12,13 +12,16 @@
 
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer-box game))
         engine   (must-be-some (cpp/TTF_CreateRendererTextEngine renderer))
-        font     (doto (must-be-some (cpp/TTF_OpenFont "res/fonts/CardboardCrown/CardboardCrown.ttf" 32))
-                   (cpp/TTF_SetFontSize 24.0))
-        text     (must-be-some (cpp/TTF_CreateText engine font "empty" 0))]
+        font     (must-be-some (cpp/TTF_OpenFont "res/fonts/CardboardCrown/CardboardCrown.ttf" 32))
+        text     (do (cpp/TTF_SetFontSize font 24.0)
+                     (must-be-some (cpp/TTF_CreateText engine font "empty" 0)))
+        text-ui  (do (cpp/TTF_SetFontSize font 36.0)
+                     (must-be-some (cpp/TTF_CreateText engine font "42" 0)))]
     (assoc game
-           ::engine (cpp/box engine)
-           ::font   (cpp/box font)
-           ::text   (cpp/box text))))
+           ::engine  (cpp/box engine)
+           ::font    (cpp/box font)
+           ::text    (cpp/box text)
+           ::text-ui (cpp/box text-ui))))
 
 (defn clean! [{:keys [::text ::engine ::font]}]
   (when text (cpp/TTF_DestroyText (cpp/unbox (:* cpp/TTF_Text) text)))

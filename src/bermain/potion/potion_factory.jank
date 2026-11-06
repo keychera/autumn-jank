@@ -7,7 +7,7 @@
    "choreograph/Easing.h")
   (:require
    [bermain.engine.anime :as anime]
-   [bermain.engine.utils :as utils :refer [s->]]
+   [bermain.engine.utils :as utils :refer [s-> insert-facts]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
    [bermain.potion.parsl :as parsl]
@@ -42,30 +42,46 @@
   (and px py (< area-x px (+ area-x area-w))
        (< area-y py (+ area-y area-h))))
 
+(def ui-OK-x 400.0)
+(def ui-OK-y 20.0)
+(def ui-NG-dist 180.0)
+(defonce judgement (atom {:OK 0 :NG 0}))
+
 (defn world-init [world _game]
+  (reset! judgement {:OK 0 :NG 0})
   (-> (reduce-kv
        (fn [world esse-id image-path]
          (o/insert world esse-id ::image/image-path image-path))
        world {:carmine-img "res/images/carmine.PNG"
               :conveyor-img "res/images/conveyor.PNG"
+              :count-OK "res/images/countOK.PNG"
+              :count-NG "res/images/countNG.PNG"
               :potion1-img "res/images/potion1.PNG"
               :potion2-img "res/images/potion2.PNG"
               :potion1NG-img "res/images/potion1NG.PNG"
               :potion2NG-img "res/images/potion2NG.PNG"})
-      (o/insert :carmine {::image/use :carmine-img
-                          ::esse/vec2-box (box-vec2 30.0 50.0)
-                          ::layer 0})
-      (o/insert :conveyor {::image/use :conveyor-img
-                           ::esse/vec2-box (box-vec2 0.0 320.0)
-                           ::layer 0})
-      (o/insert :potion1 {::image/use :potion1-img
-                          ::esse/vec2-box (box-vec2 30.0 335.0)
-                          ::potion-state ::on-conveyor
-                          ::kind ::potion})
-      (o/insert :potion2 {::image/use :potion2-img
-                          ::esse/vec2-box (box-vec2 160.0 335.0)
-                          ::potion-state ::on-conveyor
-                          ::kind ::potion})))
+      (insert-facts
+       [:count-OK {::image/use :count-OK
+                   ::esse/vec2-box (box-vec2 ui-OK-x ui-OK-y)
+                   ::layer 0}]
+       [:count-NG {::image/use :count-NG
+                   ::esse/vec2-box (box-vec2 (+ ui-OK-x ui-NG-dist) ui-OK-y)
+                   ::layer 0}]
+       [:carmine {::image/use :carmine-img
+                  ::esse/vec2-box (box-vec2 30.0 50.0)
+                  ::layer 0}]
+       [:conveyor {::image/use :conveyor-img
+                   ::esse/vec2-box (box-vec2 0.0 320.0)
+                   ::layer 0}]
+       [:potion1 {::image/use :potion1-img
+                  ::esse/vec2-box (box-vec2 30.0 335.0)
+                  ::kind ::potion}]
+       [:potion2 {::image/use :potion1-img
+                  ::esse/vec2-box (box-vec2 40.0 335.0)
+                  ::kind ::potion}]
+       [:potion3 {::image/use :potion2-img
+                  ::esse/vec2-box (box-vec2 50.0 335.0)
+                  ::kind ::potion}])))
 
 (def rules
   (o/ruleset
@@ -74,11 +90,16 @@
      [:root ::put-on-conveyor-belt true]
      :then
      (let [potion-id (keyword (str "potion" (random-uuid)))
-           potions [:potion1-img :potion2-img :potion1NG-img :potion2NG-img]
-           rand-y  [-20 0 20]]
+           potions [[:potion1-img :OK]
+                    [:potion2-img :OK]
+                    [:potion1NG-img :NG]
+                    [:potion2NG-img :NG]]
+           rand-y  [-20 0 20]
+           [img quality] (rand-nth potions)]
        (s-> session
-            (o/insert potion-id {::image/use (rand-nth potions)
+            (o/insert potion-id {::image/use img
                                  ::esse/vec2-box (cpp/box (cpp/new cpp/vec2 -20.0 (+ 335.0 (rand-nth rand-y))))
+                                 ::quality quality
                                  ::potion-state ::on-conveyor
                                  ::kind ::potion})))]
 
@@ -139,7 +160,7 @@
          (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
        (s-> session
             (o/retract esse-id ::potion-state)
-            (o/insert esse-id {::Sequence-box (cpp/box deposit-anime)})))]
+            (o/insert esse-id {::deposit-anime (cpp/box deposit-anime)})))]
 
     ::conveyor-belt
     [:what
@@ -160,39 +181,41 @@
                  (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
                (-> game
                    (world/retract-many esse-id [::potion-state])
-                   (world/insert-fact esse-id {::Sequence-box (cpp/box deposit-anime)})))))))]
+                   (world/insert-fact esse-id {::deposit-anime (cpp/box deposit-anime)})))))))]
 
-    ::vec2+Sequence
+    ::deposit-anime-trigger
     [:what
      [esse-id ::kind ::potion]
-     [esse-id ::Sequence-box Sequence-box]
+     [esse-id ::quality quality]
+     [esse-id ::deposit-anime deposit-anime]
      [esse-id ::esse/vec2-box vec2-box]
      :then
      (anime/play-episode! esse-id
        (fn [game dt]
          (let [vec2       (cpp/unbox (:* cpp/vec2) vec2-box)
-               choreo-seq (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) Sequence-box)
+               choreo-seq (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) deposit-anime)
                anime-time (get-in game [esse-id ::time] 0.0)]
            (if (< anime-time (.getDuration (cpp/* choreo-seq)))
              (let [vec2' (.getValue (cpp/* choreo-seq) anime-time)]
                (cpp/= (.-x vec2) (.-x vec2'))
                (cpp/= (.-y vec2) (.-y vec2'))
                (assoc-in game [esse-id ::time] (+ anime-time dt)))
-             (-> game
-                 (world/retract-many esse-id [::image/use ::kind ::Sequence-box ::esse/vec2-box])
-                 (anime/end-episode esse-id))))))]}))
+             (do (swap! judgement update quality + 1)
+                 (-> game
+                     (world/retract-many esse-id [::image/use ::quality ::kind ::deposit-anime ::esse/vec2-box])
+                     (anime/end-episode esse-id)))))))]}))
 
 (defn init [game]
-  (anime/play-episode! :potion-periodic
-    (fn [game dt]
-      (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
-        (if (< potion-time 0.5)
-          (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
-          (-> game
-              (world/insert-fact :root {::put-on-conveyor-belt true})
-              (assoc-in [:potion-periodic ::time] 0.0))))))
+  #_(anime/play-episode! :potion-periodic
+      (fn [game dt]
+        (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
+          (if (< potion-time 0.5)
+            (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
+            (-> game
+                (world/insert-fact :root {::put-on-conveyor-belt true})
+                (assoc-in [:potion-periodic ::time] 0.0))))))
   (-> game
-      (assoc ::time/speed 0.5)
+      (assoc ::time/speed 1.0)
       (world/establish rules world-init)))
 
 (defn render-this
@@ -208,6 +231,7 @@
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
     text-box ::text/text
+    text-ui-box ::text/text-ui
     :as game}]
   (let [renderer     (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
         text         (cpp/unbox (:* cpp/TTF_Text) text-box)
@@ -218,6 +242,17 @@
                                   (.-y vec2))) >))]
 
     (tap> (::world/this game))
+
+    (let [text-ui (cpp/unbox (:* cpp/TTF_Text) text-ui-box)
+          {:keys [OK NG]} @judgement]
+      (doto text-ui
+        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (cpp/TTF_SetTextString (str OK) 0)
+        (cpp/TTF_DrawRendererText (+ ui-OK-x 50) ui-OK-y))
+      (doto text-ui
+        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (cpp/TTF_SetTextString (str NG) 0)
+        (cpp/TTF_DrawRendererText (+ ui-OK-x ui-NG-dist 50) ui-OK-y)))
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
@@ -248,7 +283,10 @@
       (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0))))
 
 (comment
-  (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]])
+  (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]]
+           '[jank.compiler :refer [native-source]])
+
+  (native-source '(cpp/new cpp/vec2 0.0 0.0))
 
   debug-tap
 

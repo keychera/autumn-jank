@@ -12,6 +12,10 @@
   [odoyle-session rule-name]
   (first (o/query-all odoyle-session rule-name)))
 
+(defn insert-facts
+  [odoyle-session & facts]
+  (reduce (fn [w [id attr->value]] (o/insert w id attr->value)) odoyle-session facts))
+
 (defn safe-retract [odoyle-session id attr]
   (if (o/contains? odoyle-session id attr)
     (o/retract odoyle-session id attr)
