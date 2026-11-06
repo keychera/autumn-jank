@@ -1,5 +1,5 @@
 (ns bermain.potion.parsl
-  (:include "extra.hpp"))
+  (:include "extend_parsl.hpp"))
 
 (defn init [game]
   (let [sl-context (cpp/create_sl_context 2)]
