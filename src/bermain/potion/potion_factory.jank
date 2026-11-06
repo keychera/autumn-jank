@@ -10,6 +10,7 @@
    [bermain.engine.utils :as utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
+   [bermain.potion.parsl :as parsl]
    [bermain.sdl3.image :as image]
    [bermain.sdl3.sdl3-input :as input]
    [bermain.sdl3.text :as text]
@@ -21,10 +22,6 @@
 #_::esse/vec2-box
 
 (def deposit-line 530.0)
-
-(defn clean! [{:keys [::sl-context-box]}]
-  (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
-    (cpp/parsl_destroy_context sl-context)))
 
 (defn route-inputs [{pressed? ::input/pressed? :as game}]
   (cond-> game
@@ -194,10 +191,9 @@
           (-> game
               (world/insert-fact :root {::put-on-conveyor-belt true})
               (assoc-in [:potion-periodic ::time] 0.0))))))
-  (let [sl-context (cpp/create_sl_context 5)]
-    (-> (assoc game ::sl-context-box (cpp/box sl-context))
-        (assoc ::time/speed 0.5)
-        (world/establish rules world-init))))
+  (-> game
+      (assoc ::time/speed 0.5)
+      (world/establish rules world-init)))
 
 (defn render-this
   [^(:* cpp/SDL_Renderer) sdl-renderer
@@ -211,12 +207,10 @@
 
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
-    sl-context-box ::sl-context-box
     text-box ::text/text
     :as game}]
   (let [renderer     (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
         text         (cpp/unbox (:* cpp/TTF_Text) text-box)
-        sl-context   (cpp/unbox (:* cpp/parsl_context) sl-context-box)
         hit-by-mouse (:hit-by-mouse (world/ask-one game ::hit-by-mouse))
         potions (->> (world/ask-many game ::potions-to-render)
                      (sort-by (fn [{vec2-box :vec2-box}]
@@ -233,28 +227,8 @@
       (render-this sdl-renderer-box potion))
 
     (when hit-by-mouse ;; draw box around it
-      (let [{:keys [x y w h]} hit-by-mouse
-            _ (do
-                (cpp/= (.-x (cpp/aget cpp/square_vertices 0)) x)
-                (cpp/= (.-y (cpp/aget cpp/square_vertices 0)) y)
-                (cpp/= (.-x (cpp/aget cpp/square_vertices 1)) (+ x w))
-                (cpp/= (.-y (cpp/aget cpp/square_vertices 1)) y)
-                (cpp/= (.-x (cpp/aget cpp/square_vertices 2)) (+ x w))
-                (cpp/= (.-y (cpp/aget cpp/square_vertices 2)) (+ y h))
-                (cpp/= (.-x (cpp/aget cpp/square_vertices 3)) x)
-                (cpp/= (.-y (cpp/aget cpp/square_vertices 3)) (+ y h)))
-            mesh (cpp/parsl_mesh_from_lines
-                  sl-context
-                  (cpp/parsl_spine_list
-                   #_num_vertices 4
-                   #_num_spines 1
-                   #_vertices cpp/square_vertices
-                   #_spine_lengths cpp/spine_lengths
-                   #_closed true))]
-        (cpp/SDL_SetRenderDrawColor renderer 225 215 25 cpp/SDL_ALPHA_OPAQUE)
-        (let [vertices (cpp/parsl_mesh_to_SDL_Vertices mesh)
-              indices  (cpp/parsl_mesh_to_indices mesh)]
-          (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices)))))
+      (let [{:keys [x y w h]} hit-by-mouse]
+        (parsl/render-square game x y w h)))
 
     ;; debug
     (let [{:keys [mouse-x mouse-y]} game

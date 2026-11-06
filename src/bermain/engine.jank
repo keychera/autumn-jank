@@ -11,7 +11,8 @@
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
-   [bermain.engine.anime :as anime]))
+   [bermain.engine.anime :as anime]
+   [bermain.potion.parsl :as parsl]))
 
 (defn init [game]
   (-> game
@@ -21,7 +22,9 @@
       (text/init)
       (image/init)
 
-      #_game
+      (parsl/init)
+
+      #_game 
       (potion-factory/init)
 
       (#_must-be-last world/init)))
@@ -43,7 +46,7 @@
 
 (defn clean! [game]
   (doto game
-    (potion-factory/clean!)
+    (parsl/clean!)
     (anime/clean!)
     (image/clean!)
     (text/clean!)

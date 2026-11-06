@@ -1,0 +1,38 @@
+(ns bermain.potion.parsl
+  (:include "extra.hpp"))
+
+(defn init [game]
+  (let [sl-context (cpp/create_sl_context 2)]
+    (assoc game ::sl-context-box (cpp/box sl-context))))
+
+(defn render-quad
+  [{:keys [sdl-renderer-box ::sl-context-box]} [x1 y1] [x2 y2] [x3 y3] [x4 y4]]
+  (cpp/= (.-x (cpp/aget cpp/square_vertices 0)) x1)
+  (cpp/= (.-y (cpp/aget cpp/square_vertices 0)) y1)
+  (cpp/= (.-x (cpp/aget cpp/square_vertices 1)) x2)
+  (cpp/= (.-y (cpp/aget cpp/square_vertices 1)) y2)
+  (cpp/= (.-x (cpp/aget cpp/square_vertices 2)) x3)
+  (cpp/= (.-y (cpp/aget cpp/square_vertices 2)) y3)
+  (cpp/= (.-x (cpp/aget cpp/square_vertices 3)) x4)
+  (cpp/= (.-y (cpp/aget cpp/square_vertices 3)) y4)
+  (let [renderer   (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+        sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)
+        mesh       (cpp/parsl_mesh_from_lines
+                    sl-context
+                    (cpp/parsl_spine_list
+                     #_num_vertices 4
+                     #_num_spines 1
+                     #_vertices cpp/square_vertices
+                     #_spine_lengths cpp/spine_lengths
+                     #_closed true))
+        vertices (cpp/parsl_mesh_to_SDL_Vertices mesh)
+        indices  (cpp/parsl_mesh_to_indices mesh)]
+    (cpp/SDL_SetRenderDrawColor renderer 225 215 25 cpp/SDL_ALPHA_OPAQUE)
+    (cpp/SDL_RenderGeometry renderer cpp/nullptr (.data vertices) (.size vertices) (.data indices) (.size indices))))
+
+(defn render-square [game x y w h]
+  (render-quad game [x y] [(+ x w) y] [(+ x w) (+ y h)] [x (+ y h)]))
+
+(defn clean! [{:keys [::sl-context-box]}]
+  (let [sl-context (cpp/unbox (:* cpp/parsl_context) sl-context-box)]
+    (cpp/parsl_destroy_context sl-context)))
