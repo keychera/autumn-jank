@@ -1,0 +1,66 @@
+(ns bermain.potion.screen
+  (:include
+   "extra.hpp"
+   "SDL3_ttf/SDL_ttf.h")
+  (:require
+   [bermain.engine.hitbox :as hitbox]
+   [bermain.engine.utils :refer [insert-facts]]
+   [bermain.engine.world :as world]
+   [bermain.esse :as esse :refer [box-vec2]]
+   [bermain.sdl3.error :refer [must-be-some]]
+   [bermain.sdl3.text :as text]
+   [odoyle.rules :as o]))
+
+(def rules
+  (o/ruleset
+   {::menu
+    [:what
+     [menu-id ::esse/vec2-box vec2-box]
+     [menu-id ::hitbox/areas areas]]}))
+
+(defn create-menu-text
+  [^(:* cpp/TTF_TextEngine) engine
+   ^(:* cpp/TTF_Font) font]
+  (let [menu-text (do (cpp/TTF_SetFontSize font 42.0)
+                      (must-be-some (cpp/TTF_CreateText engine font "empty" 0)))]
+    (cpp/box menu-text)))
+
+(defn world-init [world {{:keys [width height main-scale]} :windows}]
+  (let [hit-area [[-10.0 0.0 130.0 48.0]]]
+    (-> world
+        (insert-facts [:start {::esse/vec2-box (box-vec2 (float (+ (/ width 2 main-scale) 120)) (float (+ (/ height 2 main-scale) 100)))
+                               ::hitbox/areas hit-area}]
+                      [:options {::esse/vec2-box (box-vec2 (float (+ (/ width 2 main-scale) 120)) (float (+ (/ height 2 main-scale) 150)))
+                                 ::hitbox/areas hit-area}]))))
+
+(defn init
+  [{:keys [::text/engine ::text/font]
+    :as game}]
+  (let [menu-text (create-menu-text engine font)]
+    (-> (world/establish game rules world-init)
+        (assoc ::menu-text menu-text))))
+
+(defn render!
+  [{menu-text ::menu-text :as game}]
+  (let [text (cpp/unbox (:* cpp/TTF_Text) menu-text)
+        menu (world/ask-many game ::menu)]
+    (doseq [{:keys [vec2-box menu-id]} menu]
+      (let [pos (cpp/unbox (:* cpp/vec2) vec2-box)]
+        (doto text
+          (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+          (cpp/TTF_SetTextString (str menu-id) 0)
+          (cpp/TTF_DrawRendererText (.-x pos) (.-y pos)))))))
+
+(defn clean! [{menu-text ::menu-text}]
+  (when menu-text (text/destroy-text menu-text)))
+
+(comment
+  (require '[bermain.engine.game-mutator :refer [inject-facts! debug-tap]])
+  debug-tap
+
+  (let [hitbox [[-10.0 0.0 130.0 48.0]]]
+    (inject-facts!
+     [:start {::hitbox/areas hitbox}]
+     [:options {::hitbox/areas hitbox}]))
+
+  :-)

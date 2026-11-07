@@ -23,8 +23,12 @@
            ::text    (cpp/box text)
            ::text-ui (cpp/box text-ui))))
 
-(defn clean! [{:keys [::text ::engine ::font]}]
-  (when text (cpp/TTF_DestroyText (cpp/unbox (:* cpp/TTF_Text) text)))
+(defn destroy-text [^(:* cpp/TTF_Text) text]
+  (cpp/TTF_DestroyText text))
+
+(defn clean! [{:keys [::text ::text-ui ::engine ::font]}]
+  (when text (destroy-text text))
+  (when text-ui (destroy-text text-ui))
   (when engine (cpp/TTF_DestroyRendererTextEngine (cpp/unbox (:* cpp/TTF_TextEngine) engine)))
   (when font (cpp/TTF_CloseFont (cpp/unbox (:* cpp/TTF_Font) font)))
   (cpp/TTF_Quit))

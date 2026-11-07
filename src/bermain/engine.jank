@@ -9,6 +9,7 @@
    [bermain.engine.parsl :as parsl]
    [bermain.engine.world :as world]
    [bermain.potion.potion-factory :as potion-factory]
+   [bermain.potion.screen :as screen]
    [bermain.sdl3.audio :as audio]
    [bermain.sdl3.error :as error]
    [bermain.sdl3.image :as image]
@@ -31,6 +32,7 @@
       (dialogue/init)
 
       #_game
+      (screen/init)
       (potion-factory/init)
 
       (#_must-be-last world/init)))
@@ -50,12 +52,14 @@
       (potion-factory/flow)))
 
 (defn render! [game]
-  (potion-factory/render! game)
+  #_(potion-factory/render! game)
+  (screen/render! game)
   (dialogue/render! game)
   (hitbox/render! game))
 
 (defn clean! [game]
   (doto game
+    (screen/clean!)
     (parsl/clean!)
     (anime/clean!)
     (image/clean!)

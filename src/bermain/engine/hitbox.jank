@@ -1,10 +1,14 @@
 (ns bermain.engine.hitbox
-  (:include "extra.hpp")
+  (:include
+   "SDL3_ttf/SDL_ttf.h"
+   "extra.hpp")
   (:require
    [bermain.engine.input :as input]
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
+   [bermain.sdl3.text :as text]
+   [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
 
 (defn inside-a-box [px py [x y w h]]
@@ -80,7 +84,20 @@
         (cpp/SDL_SetRenderDrawColor renderer 133 233 180 70)
         (cpp/SDL_RenderFillRects renderer (.data rects) (count hitbox))
         (cpp/SDL_SetRenderDrawColor renderer 133 233 180 130)
-        (cpp/SDL_RenderRects renderer (.data rects) (count hitbox))))))
+        (cpp/SDL_RenderRects renderer (.data rects) (count hitbox))))
+
+    (let [{:keys [mouse-x mouse-y]} (:mouse (world/ask-one game ::input/mouse))
+          debug-fps (::time/debug-fps game 0)
+          text      (cpp/unbox (:* cpp/TTF_Text) (::text/text game))]
+      (doto text
+        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (cpp/TTF_SetTextString (str
+                                debug-fps "\n"
+                                (format "{:.2f}" mouse-x)
+                                ", "
+                                (format "{:.2f}" mouse-y)) 0)
+        (cpp/TTF_DrawRendererText 16.0 8.0))
+      :done)))
 
 (comment
   (require '[bermain.engine.game-mutator :refer [debug-tap]])

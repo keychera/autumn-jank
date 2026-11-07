@@ -29,10 +29,6 @@
   (-> game
       (route-inputs)))
 
-(defn inside? [px py area-x area-y area-w area-h]
-  (and px py (< area-x px (+ area-x area-w))
-       (< area-y py (+ area-y area-h))))
-
 (def ui-OK-x 400.0)
 (def ui-OK-y 20.0)
 (def ui-NG-dist 180.0)
@@ -191,14 +187,14 @@
                          (anime/end-episode esse-id)))))))))]}))
 
 (defn init [game]
-  (anime/play-episode! :potion-periodic
-    (fn [game dt]
-      (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
-        (if (< potion-time 0.5)
-          (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
-          (-> game
-              (world/insert-fact :root {::put-on-conveyor-belt true})
-              (assoc-in [:potion-periodic ::time] 0.0))))))
+  #_(anime/play-episode! :potion-periodic
+      (fn [game dt]
+        (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
+          (if (< potion-time 0.5)
+            (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
+            (-> game
+                (world/insert-fact :root {::put-on-conveyor-belt true})
+                (assoc-in [:potion-periodic ::time] 0.0))))))
   (-> game
       (assoc ::time/speed 1.0)
       (world/establish rules world-init)))
@@ -215,12 +211,9 @@
 
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
-    text-box ::text/text
     text-ui-box ::text/text-ui
     :as game}]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-        text     (cpp/unbox (:* cpp/TTF_Text) text-box)
-        mouse    (:mouse (world/ask-one game ::input/mouse))
         potions  (->> (world/ask-many game ::potions-to-render)
                       (sort-by (fn [{vec2-box :vec2-box}]
                                  (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
@@ -247,21 +240,8 @@
       (render-this sdl-renderer-box potion))
 
     ;; debug
-    (let [{:keys [mouse-x mouse-y]} mouse
-          debug-fps (::time/debug-fps game 0)
-          num-of-potions (count potions)]
-      (doto text
-        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
-        (cpp/TTF_SetTextString (str
-                                debug-fps "\n"
-                                (format "{:.2f}" mouse-x)
-                                ", "
-                                (format "{:.2f}" mouse-y)
-                                "\npotions:" num-of-potions) 0)
-        (cpp/TTF_DrawRendererText 16.0 8.0))
-
-      (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
-      (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0))))
+    (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
+    (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))
 
 (comment
   (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]]
