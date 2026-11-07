@@ -1,15 +1,34 @@
 (ns bermain.engine.input
   (:include "SDL3/SDL.h")
   (:require
+   [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [odoyle.rules :as o]))
 
 (def rules
   (o/ruleset
-   {::mouse [:what [:root ::mouse mouse]]}))
+   {::mouse [:what [:root ::mouse mouse]]
+
+    ::mouse-down
+    [:what
+     [:root ::mouse-state ::idle]
+     [:root ::mouse mouse]
+     :when (:mouse-down? mouse)
+     :then (s-> session (o/insert :root ::mouse-state ::mouse-down))]
+
+    ::mouse-back-up
+    [:what
+     [:root ::mouse-state ::mouse-down]
+     [:root ::mouse mouse]
+     :when (not (:mouse-down? mouse))
+     :then (s-> session (o/insert :root ::mouse-state ::idle))]}))
+
+(defn world-init [world _game]
+  (-> world
+      (o/insert :root ::mouse-state ::idle)))
 
 (defn init [game]
-  (world/establish game rules))
+  (world/establish game rules world-init))
 
 (defn flow [{{main-scale :main-scale} :windows :as game}]
   (let [mouse-x (cpp/float)

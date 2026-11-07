@@ -131,6 +131,7 @@
 
     ::throw
     [:what
+     [:root ::input/mouse-state ::input/idle]
      [:root ::input/mouse mouse]
      [:root ::hitbox/esse-id-hit esse-id]
      [esse-id ::potion-state ::on-conveyor]
@@ -187,14 +188,14 @@
                          (anime/end-episode esse-id)))))))))]}))
 
 (defn init [game]
-  #_(anime/play-episode! :potion-periodic
-      (fn [game dt]
-        (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
-          (if (< potion-time 0.5)
-            (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
-            (-> game
-                (world/insert-fact :root {::put-on-conveyor-belt true})
-                (assoc-in [:potion-periodic ::time] 0.0))))))
+  (anime/play-episode! :potion-periodic
+    (fn [game dt]
+      (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
+        (if (< potion-time 0.5)
+          (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
+          (-> game
+              (world/insert-fact :root {::put-on-conveyor-belt true})
+              (assoc-in [:potion-periodic ::time] 0.0))))))
   (-> game
       (assoc ::time/speed 1.0)
       (world/establish rules world-init)))
