@@ -5,8 +5,7 @@
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
-   [odoyle.rules :as o]
-   [bermain.engine.hitbox :as hitbox]))
+   [odoyle.rules :as o]))
 
 (defn inside-a-box [px py [x y w h]]
   (and (< x px (+ x w)) (< y py (+ y h))))
