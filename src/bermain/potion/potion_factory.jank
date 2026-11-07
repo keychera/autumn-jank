@@ -187,7 +187,7 @@
                    (assoc-in game [esse-id ::time] (+ anime-time dt)))
                  (do (swap! judgement update quality + 1)
                      (-> game
-                         (world/retract-many esse-id [::image/use ::quality ::kind ::deposit-anime ::esse/vec2-box])
+                         (world/retract-many esse-id [::image/use ::hitbox/areas ::quality ::kind ::deposit-anime ::esse/vec2-box])
                          (anime/end-episode esse-id)))))))))]}))
 
 (defn init [game]
