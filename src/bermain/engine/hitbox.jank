@@ -5,7 +5,8 @@
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
-   [odoyle.rules :as o]))
+   [odoyle.rules :as o]
+   [bermain.engine.hitbox :as hitbox]))
 
 (defn inside-a-box [px py [x y w h]]
   (and (< x px (+ x w)) (< y py (+ y h))))
@@ -45,6 +46,9 @@
             (o/insert :root {::areas-hit hit-by-mouse
                              ::esse-id-hit (:esse-id hit-by-mouse)})))]
 
+    ::hitboxes
+    [:what [:root ::hitboxes hitboxes]]
+
     ::areas-hit
     [:what [:root ::areas-hit areas]]}))
 
@@ -53,18 +57,31 @@
 
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box :as game}]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-        hitbox   (when-let [{:keys [vec2-box areas]} (:areas (world/ask-one game ::areas-hit))] 
-                   (vec2+areas->hitbox vec2-box areas))
-        rects    (#cpp (cpp/std.vector cpp/SDL_FRect))]
-    (when hitbox
-      (doseq [[x y w h] hitbox]
-        (.push_back rects (cpp/SDL_FRect x y w h)))
-      (cpp/SDL_SetRenderDrawBlendMode renderer cpp/SDL_BLENDMODE_BLEND)
-      (cpp/SDL_SetRenderDrawColor renderer 133 233 180 70)
-      (cpp/SDL_RenderFillRects renderer (.data rects) (count hitbox))
-      (cpp/SDL_SetRenderDrawColor renderer 133 233 180 130)
-      (cpp/SDL_RenderRects renderer (.data rects) (count hitbox)))))
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)]
+
+    (when-let [hitboxes (:hitboxes (world/ask-one game ::hitboxes))]
+      (let [rects (#cpp (cpp/std.vector cpp/SDL_FRect))
+            areas-count (transduce (map (comp count :areas)) + hitboxes)]
+        (doseq [{:keys [vec2-box areas]} hitboxes]
+          (let [hitbox (vec2+areas->hitbox vec2-box areas)]
+            (doseq [[x y w h] hitbox]
+              (.push_back rects (cpp/SDL_FRect x y w h)))))
+        (cpp/SDL_SetRenderDrawBlendMode renderer cpp/SDL_BLENDMODE_BLEND)
+        (cpp/SDL_SetRenderDrawColor renderer 133 233 180 30)
+        (cpp/SDL_RenderFillRects renderer (.data rects) areas-count)
+        (cpp/SDL_SetRenderDrawColor renderer 133 233 180 70)
+        (cpp/SDL_RenderRects renderer (.data rects) areas-count)))
+
+    (when-let [{:keys [vec2-box areas]} (:areas (world/ask-one game ::areas-hit))]
+      (let [hitbox (vec2+areas->hitbox vec2-box areas)
+            rects  (#cpp (cpp/std.vector cpp/SDL_FRect))]
+        (doseq [[x y w h] hitbox]
+          (.push_back rects (cpp/SDL_FRect x y w h)))
+        (cpp/SDL_SetRenderDrawBlendMode renderer cpp/SDL_BLENDMODE_BLEND)
+        (cpp/SDL_SetRenderDrawColor renderer 133 233 180 70)
+        (cpp/SDL_RenderFillRects renderer (.data rects) (count hitbox))
+        (cpp/SDL_SetRenderDrawColor renderer 133 233 180 130)
+        (cpp/SDL_RenderRects renderer (.data rects) (count hitbox))))))
 
 (comment
   (require '[bermain.engine.game-mutator :refer [debug-tap]])

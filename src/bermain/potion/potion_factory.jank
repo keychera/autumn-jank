@@ -38,19 +38,41 @@
 (def ui-NG-dist 180.0)
 (defonce judgement (atom {:OK 0 :NG 0}))
 
+(defn default-metadata->areas [{:keys [width height]}]
+  [[0.0 0.0 (float width) (float height)]])
+
 (defn world-init [world _game]
   (reset! judgement {:OK 0 :NG 0})
   (-> (reduce-kv
-       (fn [world esse-id image-path]
-         (o/insert world esse-id ::image/image-path image-path))
-       world {:carmine-img "res/images/carmine.PNG"
-              :conveyor-img "res/images/conveyor.PNG"
-              :count-OK "res/images/countOK.PNG"
-              :count-NG "res/images/countNG.PNG"
-              :potion1-img "res/images/potion1.PNG"
-              :potion2-img "res/images/potion2.PNG"
-              :potion1NG-img "res/images/potion1NG.PNG"
-              :potion2NG-img "res/images/potion2NG.PNG"})
+       (fn [world image-id {:keys [image-path areas-fn]}]
+         (o/insert world image-id (cond-> {::image/image-path image-path}
+                                    areas-fn (assoc ::areas-fn areas-fn))))
+       world {:count-OK {:image-path "res/images/countOK.PNG"}
+              :count-NG {:image-path "res/images/countNG.PNG"}
+              :carmine-img {:image-path "res/images/carmine.PNG"}
+              :conveyor-img {:image-path "res/images/conveyor.PNG"}
+              :potion1-img {:image-path "res/images/potion1.PNG"
+                            :areas-fn (fn [{:keys [width height]}]
+                                        (let [width    (float width)
+                                              height-1 (float (/ height 1.8))
+                                              height-2 (- height height-1)
+                                              height-3 (/ height-2 2)
+                                              height-4 (+ height-1 height-3)]
+                                          [[30.0 0.0 30.0 height-1]
+                                           [20.0 height-1 60.0 height-3]
+                                           [0.0 height-4 width height-3]]))}
+              :potion2-img {:image-path "res/images/potion2.PNG" :areas-fn default-metadata->areas}
+              :potion1NG-img {:image-path "res/images/potion1NG.PNG"
+                              :areas-fn (fn [{:keys [width height]}]
+                                          (let [width    (float width)
+                                                height-1 (float (/ height 2.5))
+                                                height-2 (- height height-1)
+                                                height-3 (/ height-2 2)
+                                                height-4 (+ height-1 height-3)]
+                                            [[30.0 0.0 30.0 height-1]
+                                             [20.0 height-1 60.0 height-3]
+                                             [0.0 height-4 width height-3]]))}
+              :potion2NG-img {:image-path "res/images/potion2NG.PNG" :areas-fn default-metadata->areas}})
       (insert-facts
        [:count-OK {::image/use :count-OK
                    ::esse/vec2-box (box-vec2 ui-OK-x ui-OK-y)
@@ -63,16 +85,7 @@
                   ::layer 0}]
        [:conveyor {::image/use :conveyor-img
                    ::esse/vec2-box (box-vec2 0.0 320.0)
-                   ::layer 0}]
-       [:potion1 {::image/use :potion1-img
-                  ::esse/vec2-box (box-vec2 30.0 335.0)
-                  ::kind ::potion}]
-       [:potion2 {::image/use :potion1-img
-                  ::esse/vec2-box (box-vec2 40.0 335.0)
-                  ::kind ::potion}]
-       [:potion3 {::image/use :potion2-img
-                  ::esse/vec2-box (box-vec2 50.0 335.0)
-                  ::kind ::potion}])))
+                   ::layer 0}])))
 
 (def rules
   (o/ruleset
@@ -89,7 +102,7 @@
            [img quality] (rand-nth potions)]
        (s-> session
             (o/insert potion-id {::image/use img
-                                 ::esse/vec2-box (box-vec2 -20.0 (+ 335.0 (rand-nth rand-y)))
+                                 ::esse/vec2-box (box-vec2 -100.0 (+ 335.0 (rand-nth rand-y)))
                                  ::quality quality
                                  ::potion-state ::on-conveyor
                                  ::kind ::potion})))]
@@ -107,14 +120,18 @@
      [esse-id ::esse/vec2-box vec2-box]
      [esse-id ::kind ::potion]
      [image-id ::image/metadata metadata]
-     :then
-     ;; temporary hitbox from metadata
-     (let [{:keys [width height]} metadata
-           areas [[0.0 0.0 (float width) (float height)]]]
-       (s-> session (o/insert esse-id ::hitbox/areas areas)))
      :then-finally
      (let [all-potions (o/query-all session ::potions-to-render)]
        (s-> session (o/insert :root ::all-potions all-potions)))]
+
+    ::metadata->hitboxes
+    [:what
+     [esse-id ::image/use image-id]
+     [image-id ::areas-fn areas-fn]
+     [image-id ::image/metadata metadata]
+     :then
+     (let [areas (areas-fn metadata)]
+       (s-> session (o/insert esse-id ::hitbox/areas areas)))]
 
     ::throw
     [:what
@@ -179,14 +196,14 @@
                      (anime/end-episode esse-id)))))))]}))
 
 (defn init [game]
-  #_(anime/play-episode! :potion-periodic
-      (fn [game dt]
-        (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
-          (if (< potion-time 0.5)
-            (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
-            (-> game
-                (world/insert-fact :root {::put-on-conveyor-belt true})
-                (assoc-in [:potion-periodic ::time] 0.0))))))
+  (anime/play-episode! :potion-periodic
+    (fn [game dt]
+      (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
+        (if (< potion-time 0.5)
+          (assoc-in game [:potion-periodic ::time] (+ potion-time dt))
+          (-> game
+              (world/insert-fact :root {::put-on-conveyor-belt true})
+              (assoc-in [:potion-periodic ::time] 0.0))))))
   (-> game
       (assoc ::time/speed 1.0)
       (world/establish rules world-init)))
@@ -264,7 +281,18 @@
     (println fact))
 
   (inject-facts!
-   [:root {::put-on-conveyor-belt true}])
+   [:potion1 {::image/use :potion1-img
+              ::esse/vec2-box (box-vec2 30.0 335.0)
+              ::kind ::potion}]
+   [:potion2 {::image/use :potion1NG-img
+              ::esse/vec2-box (box-vec2 130.0 335.0)
+              ::kind ::potion}]
+   [:potion3 {::image/use :potion2-img
+              ::esse/vec2-box (box-vec2 230.0 335.0)
+              ::kind ::potion}]
+   [:potion4 {::image/use :potion2NG-img
+              ::esse/vec2-box (box-vec2 330.0 335.0)
+              ::kind ::potion}])
 
   (assoc-game! ::time/speed 0.0)
 
