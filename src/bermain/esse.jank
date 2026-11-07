@@ -1,3 +1,8 @@
-(ns bermain.esse)
+(ns bermain.esse
+  (:include "extra.hpp"))
 
 ::vec2-box
+
+#_[float float]
+(defn box-vec2 [x y] (cpp/box (cpp/new cpp/vec2 x y)))
+#_::vec2-box

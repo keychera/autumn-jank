@@ -1,4 +1,5 @@
 (ns bermain.engine.input
+  (:include "SDL3/SDL.h")
   (:require
    [bermain.engine.world :as world]
    [odoyle.rules :as o]))
