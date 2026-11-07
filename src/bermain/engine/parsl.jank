@@ -1,4 +1,4 @@
-(ns bermain.potion.parsl
+(ns bermain.engine.parsl
   (:include "extend_parsl.hpp"))
 
 (defn init [game]
