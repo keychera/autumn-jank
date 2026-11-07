@@ -1,8 +1,11 @@
 (ns bermain.engine
   (:require
+   [bermain.engine.anime :as anime]
    [bermain.engine.fact-queue :as fact-queue]
-   [bermain.engine.world :as world]
    [bermain.engine.game-mutator :as game-mutator]
+   [bermain.engine.hitbox :as hitbox]
+   [bermain.engine.world :as world]
+   [bermain.potion.parsl :as parsl]
    [bermain.potion.potion-factory :as potion-factory]
    [bermain.sdl3.audio :as audio]
    [bermain.sdl3.error :as error]
@@ -10,9 +13,7 @@
    [bermain.sdl3.sdl3 :as sdl3]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
-   [bermain.sdl3.time :as time]
-   [bermain.engine.anime :as anime]
-   [bermain.potion.parsl :as parsl]))
+   [bermain.sdl3.time :as time]))
 
 (defn init [game]
   (-> game
@@ -23,6 +24,7 @@
       (image/init)
 
       (parsl/init)
+      (hitbox/init)
 
       #_game 
       (potion-factory/init)
@@ -42,7 +44,8 @@
       (potion-factory/flow)))
 
 (defn render! [game]
-  (potion-factory/render! game))
+  (potion-factory/render! game)
+  (hitbox/render! game))
 
 (defn clean! [game]
   (doto game
