@@ -11,7 +11,7 @@
 (defn init [game]
   (world/establish game rules))
 
-(defn flow [{main-scale :main-scale :as game}]
+(defn flow [{{main-scale :main-scale} :windows :as game}]
   (let [mouse-x (cpp/float)
         mouse-y (cpp/float)
         _ (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))

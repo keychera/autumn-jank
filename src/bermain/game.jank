@@ -38,7 +38,7 @@ int jank_sdl_run(int argc, char *argv[]) {
         numkeys      (cpp/int)
         kb-state     (cpp/SDL_GetKeyboardState (cpp/& numkeys))
         game         (assoc game
-                            :main-scale       main-scale
+                            :windows          {:width width :height height :main-scale main-scale}
                             :sdl-renderer-box (cpp/box sdl-renderer)
                             :sdl-window-box   (cpp/box sdl-window)
                             :kb-state-box     (cpp/box kb-state))]
