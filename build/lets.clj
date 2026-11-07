@@ -108,10 +108,12 @@
     (log (str "  include dir: " sdl-dir "/include"))
     (log (str "  bin dir: " sdl-dir "/bin"))))
 
-(defn gather-shared-libs [& _]
+(defn gather-shared-libs [to-here]
   (doseq [sdl-dep [sdl3-dep sdl3-image-dep sdl3-ttf-dep sdl3-mixer-dep]]
     (fs/copy (str dot-libs "/" (:release-dir sdl-dep) "/" (:dll-file sdl-dep))
-             (str @target-dir "/" (str/replace-first (:dll-file sdl-dep) #"bin/" "")) {:replace-existing true})))
+             (str to-here "/" (str/replace-first (:dll-file sdl-dep) #"bin/" "")) {:replace-existing true}))
+  (doseq [file (fs/glob (str dot-libs "/missing-pieces") "*.dll")]
+    (fs/copy file to-here {:replace-existing true})))
 
 (defn prep [args]
   (prep-kondo args)
@@ -160,7 +162,8 @@
   [{:keys [profile?] :as args}]
   (println "compile-jank with" args)
   (let [jedn (->jank-deps-edn @deps-basis)
-        jout (-> @deps-basis :jank :compile-out)
+        jout (cond-> (-> @deps-basis :jank :compile-out)
+               :profile? (str "---profile"))
         jcmd (jank-command jedn "compile" {:main-module (get-main-module @deps-basis)
                                            :extra ["-DPAR_STREAMLINES_IMPLEMENTATION"
                                                    "-DSDL_MAIN_HANDLED"
@@ -171,15 +174,25 @@
                     (cond-> []
                       ;; https://discourse.llvm.org/t/generate-coff-symbols-even-when-generating-pdb/80488/2
                       profile? (conj "-g -gcodeview"
-                                     "-fuse-ld=lld" 
+                                     "-fuse-ld=lld"
                                      "-Wl,/debug:full"
                                      "-Wl,/pdbaltpath:%_PDB%")
                       (fs/windows?) (conj "-Wl,-subsystem,windows")))]
       (b/process {:env {"JANK_EXTRA_FLAGS" JANK_EXTRA_FLAGS}
                   :command-args jcmd}))
     (when (fs/windows?)
-      (gather-shared-libs))))
+      (gather-shared-libs @target-dir))))
 
 (defn play [& _]
   (let [main-exe (str @target-dir "/" (-> @deps-basis :jank :compile-out) ".exe")]
     (b/process {:command-args [main-exe]})))
+
+(defn ship [& _]
+  (let [jout (-> @deps-basis :jank :compile-out)
+        🚢   (str "ship/" jout)
+        exe  (str 🚢 "/" jout ".exe")]
+    (io/make-parents exe)
+    (gather-shared-libs 🚢)
+    (fs/copy-tree "res" (str 🚢 "/res") {:replace-existing true})
+    (fs/copy (str @target-dir "/" jout ".exe") exe {:replace-existing true})
+    (fs/zip (str 🚢 ".zip") 🚢 {:root "ship"})))

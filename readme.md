@@ -16,8 +16,14 @@ bb repl-dev
 # AOT compile
 bb compile
 
+# run the compiled game
+bb lets play
+
 # AOR compile enabling profiling for Windows Performance Recorder
 bb compile :profile?
+
+# ship
+bb lets ship
 ```
 
 ## profiling
@@ -25,7 +31,7 @@ bb compile :profile?
 ```sh
 bb compile :profile?
 
-./target/potion-inspector.exe
+./target/potion-inspector---profile.exe
 
 (need separate admin cmd)
 wpr -start CPU

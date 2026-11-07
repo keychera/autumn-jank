@@ -6,6 +6,7 @@
 .jank-repl-history
 .nrepl-port
 target*
+ship*
 
 # pseudo deps.edn
 .libs
