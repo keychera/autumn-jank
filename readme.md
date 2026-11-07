@@ -36,3 +36,5 @@ woes
 7. the mismatch float int type crash during repl (windows woes)
 8. the extra.hpp ld.lld: error: duplicate symbol when AOT compile (lack of c++ knowledge)
 9. fail to build inside Steam Linux Runtime 4 (lack of c++ knowledge)
+10. naming binding the same name as type, runtime error
+11. libunwind:      pc not in table, pc=0x14D23563F3F (windows woes, ikappakiさん、頑張れ！！ https://github.com/lhames/llvm-project/pull/5 , https://github.com/llvm/llvm-project/issues/163503)

@@ -10,15 +10,14 @@
         "starting game!")))
 
 (defn dev []
-  (future
-    (while true
-      (try
-        (when @start-atom
-          (#'game/-main)
-          (reset! start-atom false))
-        (catch cpp/jank.runtime.object_ref e
-          (println :caught e)
-          (reset! start-atom false))))))
+  (while true
+    (try
+      (when @start-atom
+        (#'game/-main)
+        (reset! start-atom false))
+      (catch :default _
+        (println "error!")
+        (reset! start-atom false)))))
 
 (defonce _ (dev))
 
