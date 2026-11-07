@@ -1,46 +1,80 @@
 (ns bermain.engine.hitbox
+  (:include "extra.hpp")
   (:require
+   [bermain.engine.input :as input]
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
+   [bermain.esse :as esse]
    [odoyle.rules :as o]))
-
-(def rules
-  (o/ruleset
-   {::hitbox
-    [:what
-     [esse-id ::hitbox hitbox]
-     :then-finally
-     (let [hitboxes (o/query-all session ::hitbox)]
-       (s-> session (o/insert :root ::hitboxes hitboxes)))]}))
-
-(defn init [game]
-  (world/establish game rules))
 
 (defn inside-a-box [px py [x y w h]]
   (and (< x px (+ x w)) (< y py (+ y h))))
 
-(defn inside-hitbox? [[p1 p2] hitbox]
+(defn inside-hitbox? [p1 p2 hitbox]
   (some (fn [sub-hitbox] (inside-a-box p1 p2 sub-hitbox)) hitbox))
 
+(defn vec2+areas->hitbox [^(:* cpp/vec2) a-vec2 areas]
+  (let [root-x (.-x a-vec2) root-y (.-y a-vec2)]
+    (into [] (map (fn [[x y w h]] [(+ root-x x) (+ root-y y) w h])) areas)))
+
+(defn under-mouse-xf [mouse-x mouse-y]
+  (comp
+   (filter (fn [{:keys [vec2-box areas]}]
+             (let [hitbox (vec2+areas->hitbox vec2-box areas)]
+               (inside-hitbox? mouse-x mouse-y hitbox))))
+   (take 1)))
+
+(def rules
+  (o/ruleset
+   {::vec2+areas
+    [:what
+     [esse-id ::esse/vec2-box vec2-box]
+     [esse-id ::areas areas]
+     :then-finally
+     (let [hitboxes (o/query-all session ::vec2+areas)]
+       (s-> session (o/insert :root ::hitboxes hitboxes)))]
+
+    ::hitbox-under-mouse
+    [:what
+     [:root ::hitboxes hitboxes]
+     [:root ::input/mouse mouse]
+     :then
+     (let [{:keys [mouse-x mouse-y]} mouse
+           hit-by-mouse (first (into [] (under-mouse-xf mouse-x mouse-y) hitboxes))]
+       (s-> session
+            (o/insert :root {::areas-hit hit-by-mouse
+                             ::esse-id-hit (:esse-id hit-by-mouse)})))]
+
+    ::areas-hit
+    [:what [:root ::areas-hit areas]]}))
+
+(defn init [game]
+  (world/establish game rules))
+
 (defn render!
-  [{sdl-renderer-box :sdl-renderer-box}]
+  [{sdl-renderer-box :sdl-renderer-box :as game}]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-        hitbox [[10.0 10.0 10.0 10.0]
-                [90.0 90.0 100.0 100.0]]
-        rects (#cpp (cpp/std.vector cpp/SDL_FRect))]
-    (doseq [[x y w h] hitbox]
-      (.push_back rects (cpp/SDL_FRect x y w h)))
-    (cpp/SDL_SetRenderDrawBlendMode renderer cpp/SDL_BLENDMODE_BLEND)
-    (cpp/SDL_SetRenderDrawColor renderer 133 233 180 140)
-    (cpp/SDL_RenderFillRects renderer (.data rects) (count hitbox))
-    (cpp/SDL_SetRenderDrawColor renderer 133 233 180 180)
-    (cpp/SDL_RenderRects renderer (.data rects) (count hitbox))))
+        hitbox   (when-let [{:keys [vec2-box areas]} (:areas (world/ask-one game ::areas-hit))] 
+                   (vec2+areas->hitbox vec2-box areas))
+        rects    (#cpp (cpp/std.vector cpp/SDL_FRect))]
+    (when hitbox
+      (doseq [[x y w h] hitbox]
+        (.push_back rects (cpp/SDL_FRect x y w h)))
+      (cpp/SDL_SetRenderDrawBlendMode renderer cpp/SDL_BLENDMODE_BLEND)
+      (cpp/SDL_SetRenderDrawColor renderer 133 233 180 70)
+      (cpp/SDL_RenderFillRects renderer (.data rects) (count hitbox))
+      (cpp/SDL_SetRenderDrawColor renderer 133 233 180 130)
+      (cpp/SDL_RenderRects renderer (.data rects) (count hitbox)))))
 
 (comment
+  (require '[bermain.engine.game-mutator :refer [debug-tap]])
 
   (let [hitboxes [[10 10 10 10]
-                  [90 90 10 10]]
-        target   [95 95]]
-    (inside-hitbox? target hitboxes))
+                  [90 90 10 10]]]
+    (inside-hitbox? 95 95 hitboxes))
+
+  debug-tap
+  (count debug-tap)
+  (first (into [] (under-mouse-xf 31.0 336.0) debug-tap))
 
   :-)

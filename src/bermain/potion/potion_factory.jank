@@ -10,16 +10,13 @@
    [bermain.engine.input :as input]
    [bermain.engine.utils :as utils :refer [s-> insert-facts]]
    [bermain.engine.world :as world]
-   [bermain.esse :as esse]
+   [bermain.esse :as esse :refer [box-vec2]]
    [bermain.sdl3.image :as image]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
-   [odoyle.rules :as o]))
-
-#_[float float]
-(defn box-vec2 [x y] (cpp/box (cpp/new cpp/vec2 x y)))
-#_::esse/vec2-box
+   [odoyle.rules :as o]
+   [bermain.engine.hitbox :as hitbox]))
 
 (def deposit-line 530.0)
 
@@ -92,7 +89,7 @@
            [img quality] (rand-nth potions)]
        (s-> session
             (o/insert potion-id {::image/use img
-                                 ::esse/vec2-box (cpp/box (cpp/new cpp/vec2 -20.0 (+ 335.0 (rand-nth rand-y))))
+                                 ::esse/vec2-box (box-vec2 -20.0 (+ 335.0 (rand-nth rand-y)))
                                  ::quality quality
                                  ::potion-state ::on-conveyor
                                  ::kind ::potion})))]
@@ -110,37 +107,19 @@
      [esse-id ::esse/vec2-box vec2-box]
      [esse-id ::kind ::potion]
      [image-id ::image/metadata metadata]
+     :then
+     ;; temporary hitbox from metadata
+     (let [{:keys [width height]} metadata
+           areas [[0.0 0.0 (float width) (float height)]]]
+       (s-> session (o/insert esse-id ::hitbox/areas areas)))
      :then-finally
      (let [all-potions (o/query-all session ::potions-to-render)]
        (s-> session (o/insert :root ::all-potions all-potions)))]
 
-    ::potions-under-mouse
-    [:what
-     [:root ::all-potions all-potions]
-     [:root ::input/mouse mouse]
-     :then
-     (let [{:keys [mouse-x mouse-y]} mouse
-           mouse-xf (comp
-                     (map (fn [{:keys [vec2-box esse-id]
-                                {:keys [width height]} :metadata}]
-                            (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                              {:esse-id esse-id :x (.-x vec2) :y (.-y vec2) :w width :h height})))
-                     (filter (fn [{:keys [x y w h]}]
-                               (inside? mouse-x mouse-y x y w h)))
-                     (take 1))
-           hit-by-mouse (first (into [] mouse-xf all-potions))]
-       (s-> session
-            (o/insert :root {::hit-by-mouse hit-by-mouse
-                             ::target-esse-id (:esse-id hit-by-mouse)})))]
-
-    ::hit-by-mouse
-    [:what
-     [:root ::hit-by-mouse hit-by-mouse]]
-
     ::throw
     [:what
      [:root ::input/mouse mouse]
-     [:root ::target-esse-id esse-id]
+     [:root ::hitbox/esse-id-hit esse-id]
      [esse-id ::potion-state ::on-conveyor]
      [esse-id ::esse/vec2-box vec2-box]
      :when (:mouse-down? mouse)
@@ -235,7 +214,7 @@
                                  (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
                                    (.-y vec2))) >))]
 
-    (tap> (::world/this game))
+    #_(tap> (::world/this game))
 
     (let [text-ui (cpp/unbox (:* cpp/TTF_Text) text-ui-box)
           {:keys [OK NG]} @judgement]
