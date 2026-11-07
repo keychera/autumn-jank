@@ -1,0 +1,201 @@
+(ns bermain.engine.dialogue
+  (:include
+   "SDL3_ttf/SDL_ttf.h")
+  (:require
+   [bermain.engine.utils :refer [query-one s->]]
+   [bermain.engine.world :as world]
+   [bermain.sdl3.audio :as audio]
+   [bermain.sdl3.text :as text]
+   [bermain.sdl3.time :as time]
+   [odoyle.rules :as o]
+   [bermain.engine.anime :as anime]))
+
+(defn dialogue->piece
+  [^(:* cpp/TTF_TextEngine) engine
+   ^(:* cpp/TTF_Font) font
+   dialogue-str]
+  (let [TTF_Text (cpp/TTF_CreateText engine font dialogue-str 0)
+        w (cpp/int) h (cpp/int)
+        _        (cpp/TTF_GetTextSize TTF_Text (cpp/& w) (cpp/& h))]
+    {:TTF_Text (cpp/box TTF_Text)
+     :dialogue dialogue-str
+     :length   (count dialogue-str)
+     :text-w   w}))
+
+(defn break-dialogues [engine font effects dialogue]
+  (cond
+    (string? dialogue)
+    [(dialogue->piece engine font dialogue)]
+
+    (vector? dialogue)
+    (reduce (fn dialouge-reducer [acc d]
+              (if (vector? d)
+                (let [[dialogue effect-key] d
+                      effect-fn ((get effects effect-key))]
+                  (conj acc (assoc (dialogue->piece engine font dialogue)
+                                   :effect-fn effect-fn)))
+                (conj acc (dialogue->piece engine font d))))
+            [] dialogue)
+
+    :else [(dialogue->piece engine font (str dialogue))]))
+
+(defn merge-two-dialogue [a b]
+  (letfn [(ensure-vec [dialogue]
+            (if (vector? dialogue) dialogue [dialogue]))]
+    (into (ensure-vec a) (ensure-vec b))))
+
+(defn count-dialogue [dialogue]
+  (cond
+    (string? dialogue) (count dialogue)
+
+    (vector? dialogue)
+    (reduce (fn dialouge-reducer [acc d]
+              (if (vector? d)
+                (+ acc (count (first d)))
+                (+ acc (count d))))
+            0 dialogue)
+
+    :else (count (str dialogue))))
+
+(def rules
+  (o/ruleset
+   {::tick [:what [esse-id ::tick tick]]
+
+    ::dialogue-play
+    [:what
+     [esse-id ::play the-play]
+     [esse-id ::play-progress play-progress]
+     [esse-id ::dialogue prev-dialogue {:then false}]
+     :then
+     (let [{:keys [players scripts]} the-play]
+       (when-let [[player-key dialogue & attributes] (get scripts play-progress)]
+         (let [player            (get players player-key)
+               attrs-set         (set attributes)
+               dialogue          (if (:+ attrs-set) (merge-two-dialogue prev-dialogue dialogue) dialogue)
+               dialogue-progress (if (:+ attrs-set) (count-dialogue prev-dialogue) 0)]
+           (s-> session
+                (o/insert esse-id
+                          {::player            player
+                           ::dialogue          dialogue
+                           ::dialogue-length   (count-dialogue dialogue)
+                           ::dialogue-progress dialogue-progress})))))]
+
+    ::next-dialogue
+    [:what
+     [esse-id ::control ::next-dialogue]
+     [esse-id ::play-progress play-progress {:then false}]
+     :then
+     (s-> session (o/insert esse-id {::play-progress (inc play-progress)}))]
+
+    ::break-dialogue
+    [:what
+     [::global ::text/engine engine]
+     [::global ::text/font font]
+     [esse-id ::play the-play]
+     [esse-id ::dialogue dialogue]
+     :then
+     (let [{:keys [effects]} the-play
+           dialogue-pieces (break-dialogues engine font effects dialogue)]
+       (s-> session
+            (o/insert esse-id {::dialogue-pieces dialogue-pieces})))]
+
+    ::animate-dialogue
+    [:what
+     [esse-id ::tick tick]
+     [esse-id ::player player]
+     [esse-id ::dialogue-pieces dialogue-pieces]
+     [esse-id ::dialogue-length dialogue-length]
+     [esse-id ::dialogue-progress progress {:then false}]
+     :then
+     (when (<= progress dialogue-length)
+       (s-> session
+            (o/insert esse-id ::dialogue-progress (inc progress))
+            (o/insert esse-id ::audio/play-tututu (< progress dialogue-length))))]}))
+
+(defn world-init [world {:keys [::text/engine ::text/font]}]
+  (-> world
+      (o/insert ::global {::text/engine engine ::text/font font})))
+
+(def tick-length 0.02)
+
+(defn dialogue-tick [game dt]
+  (let [tick-progress (::tick-progress game 0.0)]
+    (if (< tick-progress tick-length)
+      (assoc game ::tick-progress (+ tick-progress dt))
+      (let [tick (::tick game 0)]
+        (-> (assoc game ::tick (inc tick) ::tick-progress 0.0)
+            (world/insert-fact :root {::tick (inc tick)}))))))
+
+(defn init [game]
+  (anime/play-episode! :dialogue-tick
+    (fn [game dt] (dialogue-tick game dt)))
+  (world/establish game rules world-init))
+
+(defn render!
+  [{world ::world/this
+    tt ::time/total
+    :as game}]
+  (let [text (cpp/unbox (:* cpp/TTF_Text) (::text/text game))]
+    (when-let [{:keys [player dialogue-pieces progress]} (query-one world ::animate-dialogue)]
+      (doto text
+        (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+        (cpp/TTF_SetTextString (-> player :name) 0)
+        (cpp/TTF_DrawRendererText 24.0 260.0))
+
+      (loop [[piece & remains] dialogue-pieces
+             local-progress 0
+             local-width 0]
+        (when piece
+          (let [{:keys [TTF_Text dialogue length text-w effect-fn]} piece
+                TTF_Text (cpp/unbox (:* cpp/TTF_Text) TTF_Text)
+                current  (- progress local-progress)
+                dialogue (subs dialogue 0 (min (max current 0) length))
+
+                x-pos    (+ 30.0 local-width)
+                y-pos    (if effect-fn
+                           (effect-fn {:target 290.0 :time tt})
+                           290.0)]
+            (doto TTF_Text
+              (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
+              (cpp/TTF_SetTextString dialogue 0)
+              (cpp/TTF_DrawRendererText x-pos y-pos))
+            (recur remains length (+ local-width text-w))))))))
+
+(def jank-play
+  {:players {:NA {:name "NARRATOR"}
+             :d  {:name "Dofida"}
+             :nf {:name "Noifasui"}}
+   :effects {:funky (fn []
+                      (fn [{:keys [target time]}]
+                        (+ target (* 2 (cpp/sin (* 8.0 (float time)))))))
+             :shake (fn []
+                      (fn [{:keys [target]}]
+                        (+ target (- (* 4 (rand)) 2))))}
+   :scripts [[:d "oh."]
+             [:d [" so this is " ["existence." :funky]] :+]
+             [:d "for a language named jank,"]
+             [:d "this doesn't feel janky at all."]
+             [:nf "this is not jank"]
+             [:d [["WHAT?" :shake]] :camera-shake]
+             [:d " What do you mean this is not jank?!" :+]
+             [:nf "This is ClojureScript"]
+             [:NA "This man is lying for dramatic effect"]]})
+
+(comment
+  (require '[bermain.engine.game-mutator :refer [inject-facts! debug-tap]])
+
+  (inject-facts!
+   [:root {::tick-length 0.02
+           ::dialogue ""
+           ::dialogue-progress 0
+           ::play jank-play
+           ::play-progress 1}])
+
+  (inject-facts! [:root {::control ::next-dialogue}])
+
+  (count (o/query-all debug-tap))
+
+  (doseq [fact (o/query-all debug-tap)]
+    (println fact))
+
+  :-)
