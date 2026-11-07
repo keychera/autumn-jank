@@ -141,16 +141,9 @@
      [esse-id ::esse/vec2-box vec2-box]
      :when (:mouse-down? mouse)
      :then
-     (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
-           deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
-           rand-val      [-50 -40 30 0 30 40 50]]
-       (doto (cpp/* deposit-anime)
-         (cpp/thenRampTo (cpp/vec2 (float (+ 630 (rand-nth rand-val)))
-                                   (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
-         (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
-       (s-> session
-            (o/retract esse-id ::potion-state)
-            (o/insert esse-id {::deposit-anime (cpp/box deposit-anime)})))]
+     (s-> session
+          (o/retract esse-id ::potion-state)
+          (o/insert esse-id {::deposit-anime true}))]
 
     ::conveyor-belt
     [:what
@@ -162,38 +155,40 @@
          (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
            (if (< (.-x vec2) deposit-line)
              (do (cpp/+= (.-x vec2) (* 74.0 dt)) game)
-             (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
-                   deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
-                   rand-val      [-50 -40 30 0 30 40 50]]
-               (doto (cpp/* deposit-anime)
-                 (cpp/thenRampTo (cpp/vec2 (float (+ 630 (rand-nth rand-val)))
-                                           (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
-                 (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
-               (-> game
-                   (world/retract-many esse-id [::potion-state])
-                   (world/insert-fact esse-id {::deposit-anime (cpp/box deposit-anime)})))))))]
+             (-> game
+                 (world/retract-many esse-id [::potion-state])
+                 (world/insert-fact esse-id {::deposit-anime true}))))))]
 
-    ::deposit-anime-trigger
+    ::deposit-anime
     [:what
      [esse-id ::kind ::potion]
      [esse-id ::quality quality]
-     [esse-id ::deposit-anime deposit-anime]
+     [esse-id ::deposit-anime true]
      [esse-id ::esse/vec2-box vec2-box]
      :then
-     (anime/play-episode! esse-id
-       (fn [game dt]
-         (let [vec2       (cpp/unbox (:* cpp/vec2) vec2-box)
-               choreo-seq (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) deposit-anime)
-               anime-time (get-in game [esse-id ::time] 0.0)]
-           (if (< anime-time (.getDuration (cpp/* choreo-seq)))
-             (let [vec2' (.getValue (cpp/* choreo-seq) anime-time)]
-               (cpp/= (.-x vec2) (.-x vec2'))
-               (cpp/= (.-y vec2) (.-y vec2'))
-               (assoc-in game [esse-id ::time] (+ anime-time dt)))
-             (do (swap! judgement update quality + 1)
-                 (-> game
-                     (world/retract-many esse-id [::image/use ::quality ::kind ::deposit-anime ::esse/vec2-box])
-                     (anime/end-episode esse-id)))))))]}))
+     (let [vec2          (cpp/unbox (:* cpp/vec2) vec2-box)
+           deposit-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
+           rand-val      [-50 -40 30 0 30 40 50]]
+       (doto (cpp/* deposit-anime)
+         (cpp/thenRampTo (cpp/vec2 (float (+ 630 (rand-nth rand-val)))
+                                   (float (+ 228 (rand-nth rand-val)))) 1.0 (cpp/choreograph.EaseOutQuint))
+         (cpp/thenRampTo (cpp/vec2 630 500) 0.2))
+       (s-> session (o/retract esse-id ::deposit-anime))
+       (let [deposit-anime-box (cpp/box deposit-anime)]
+         (anime/play-episode! esse-id
+           (fn [game dt]
+             (let [vec2       (cpp/unbox (:* cpp/vec2) vec2-box)
+                   choreo-seq (cpp/unbox (:* (choreograph.Sequence cpp/vec2)) deposit-anime-box)
+                   anime-time (get-in game [esse-id ::time] 0.0)]
+               (if (< anime-time (.getDuration (cpp/* choreo-seq)))
+                 (let [vec2' (.getValue (cpp/* choreo-seq) anime-time)]
+                   (cpp/= (.-x vec2) (.-x vec2'))
+                   (cpp/= (.-y vec2) (.-y vec2'))
+                   (assoc-in game [esse-id ::time] (+ anime-time dt)))
+                 (do (swap! judgement update quality + 1)
+                     (-> game
+                         (world/retract-many esse-id [::image/use ::quality ::kind ::deposit-anime ::esse/vec2-box])
+                         (anime/end-episode esse-id)))))))))]}))
 
 (defn init [game]
   (anime/play-episode! :potion-periodic
