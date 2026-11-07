@@ -1,5 +1,22 @@
 # autumn jank
 
+## build
+
+need jank, babashka
+```sh
+# download sdl, prep devtime goodies (still hardcoded for windows)
+bb prep
+
+# run the game
+bb jank
+
+# run the game and the repl
+bb repl-dev
+
+# AOT compile
+bb compile
+```
+
 ## profiling
 
 wpr -start CPU
