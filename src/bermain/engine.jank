@@ -4,6 +4,7 @@
    [bermain.engine.fact-queue :as fact-queue]
    [bermain.engine.game-mutator :as game-mutator]
    [bermain.engine.hitbox :as hitbox]
+   [bermain.engine.input :as input]
    [bermain.engine.parsl :as parsl]
    [bermain.engine.world :as world]
    [bermain.potion.potion-factory :as potion-factory]
@@ -23,10 +24,11 @@
       (text/init)
       (image/init)
 
+      (input/init)
       (parsl/init)
       (hitbox/init)
 
-      #_game 
+      #_game
       (potion-factory/init)
 
       (#_must-be-last world/init)))
@@ -36,11 +38,13 @@
       (#_dev-only game-mutator/flow)
 
       (sdl3-input/poll-events)
+      (input/flow)
       (fact-queue/flow)
       (world/tick)
       (time/flow)
       (audio/flow)
       (anime/flow)
+
       (potion-factory/flow)))
 
 (defn render! [game]

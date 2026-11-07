@@ -1,0 +1,22 @@
+(ns bermain.engine.input
+  (:require
+   [bermain.engine.world :as world]
+   [odoyle.rules :as o]))
+
+(def rules
+  (o/ruleset
+   {::mouse [:what [:root ::mouse mouse]]}))
+
+(defn init [game]
+  (world/establish game rules))
+
+(defn flow [{main-scale :main-scale :as game}]
+  (let [mouse-x (cpp/float)
+        mouse-y (cpp/float)
+        _ (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
+        mouse-x (/ mouse-x main-scale)
+        mouse-y (/ mouse-y main-scale)]
+    (-> game
+        (world/insert-fact :root {::mouse {:mouse-down? (:mouse-down? game)
+                                           :mouse-x mouse-x
+                                           :mouse-y mouse-y}}))))

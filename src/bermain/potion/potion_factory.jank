@@ -7,11 +7,12 @@
    "choreograph/Easing.h")
   (:require
    [bermain.engine.anime :as anime]
+   [bermain.engine.input :as input]
    [bermain.engine.utils :as utils :refer [s-> insert-facts]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse]
    [bermain.sdl3.image :as image]
-   [bermain.sdl3.sdl3-input :as input]
+   [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
@@ -22,20 +23,14 @@
 
 (def deposit-line 530.0)
 
-(defn route-inputs [{pressed? ::input/pressed? :as game}]
+(defn route-inputs [{pressed? ::sdl3-input/pressed? :as game}]
   (cond-> game
-    (::input/space pressed?)
+    (::sdl3-input/space pressed?)
     (world/insert-fact :root {::put-on-conveyor-belt true})))
 
-(defn flow [{main-scale :main-scale :as game}]
-  (let [mouse-x (cpp/float)
-        mouse-y (cpp/float)]
-    (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
-    (let [mouse-x (/ mouse-x main-scale)
-          mouse-y (/ mouse-y main-scale)]
-      (-> (assoc game :mouse-x mouse-x :mouse-y mouse-y)
-          (world/insert-fact :root {::mouse (select-keys game [:mouse-down? :mouse-x :mouse-y])})
-          (route-inputs)))))
+(defn flow [game]
+  (-> game
+      (route-inputs)))
 
 (defn inside? [px py area-x area-y area-w area-h]
   (and px py (< area-x px (+ area-x area-w))
@@ -122,7 +117,7 @@
     ::potions-under-mouse
     [:what
      [:root ::all-potions all-potions]
-     [:root ::mouse mouse]
+     [:root ::input/mouse mouse]
      :then
      (let [{:keys [mouse-x mouse-y]} mouse
            mouse-xf (comp
@@ -144,7 +139,7 @@
 
     ::throw
     [:what
-     [:root ::mouse mouse]
+     [:root ::input/mouse mouse]
      [:root ::target-esse-id esse-id]
      [esse-id ::potion-state ::on-conveyor]
      [esse-id ::esse/vec2-box vec2-box]
@@ -232,12 +227,13 @@
     text-box ::text/text
     text-ui-box ::text/text-ui
     :as game}]
-  (let [renderer     (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-        text         (cpp/unbox (:* cpp/TTF_Text) text-box)
-        potions (->> (world/ask-many game ::potions-to-render)
-                     (sort-by (fn [{vec2-box :vec2-box}]
-                                (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                                  (.-y vec2))) >))]
+  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+        text     (cpp/unbox (:* cpp/TTF_Text) text-box)
+        mouse    (:mouse (world/ask-one game ::input/mouse))
+        potions  (->> (world/ask-many game ::potions-to-render)
+                      (sort-by (fn [{vec2-box :vec2-box}]
+                                 (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
+                                   (.-y vec2))) >))]
 
     (tap> (::world/this game))
 
@@ -260,7 +256,7 @@
       (render-this sdl-renderer-box potion))
 
     ;; debug
-    (let [{:keys [mouse-x mouse-y]} game
+    (let [{:keys [mouse-x mouse-y]} mouse
           debug-fps (::time/debug-fps game 0)
           num-of-potions (count potions)]
       (doto text
