@@ -289,9 +289,9 @@
     :as game}]
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
         potions  (->> (world/ask-many game ::potions-to-render)
-                      (sort-by (fn [{vec2-box :vec2-box}]
+                      (sort-by (fn [{vec2-box :vec2-box metadata :metadata}]
                                  (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
-                                   (.-y vec2))) >))]
+                                   (+ (.-y vec2) (:height metadata))))))]
 
     #_(tap> (::world/this game))
 
