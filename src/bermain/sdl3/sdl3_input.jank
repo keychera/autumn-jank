@@ -5,6 +5,7 @@
   {::esc   cpp/SDL_SCANCODE_ESCAPE
    ::a     cpp/SDL_SCANCODE_A
    ::d     cpp/SDL_SCANCODE_D
+   ::p     cpp/SDL_SCANCODE_P
    ::space cpp/SDL_SCANCODE_SPACE})
 
 (defn process-mouse [{{main-scale :main-scale} :windows :as game}]
@@ -18,9 +19,11 @@
             :mouse-x mouse-x
             :mouse-y mouse-y)))
 
-(defn process-input [{:keys [kb-state-box] :as prev-game}]
+(defn process-input [{:keys [kb-state-box ::pressed?] :as prev-game}]
   (let [kb-state (cpp/unbox (:* (:const cpp/bool)) kb-state-box)
-        game     (assoc prev-game ::pressed? #{})]
+        game     (assoc prev-game
+                        ::pressed? #{}
+                        ::prev-pressed? pressed?)]
     (reduce-kv
      (fn [game' keyname scancode]
        (if (cpp/aget kb-state (cpp/int scancode))

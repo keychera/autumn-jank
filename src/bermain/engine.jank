@@ -57,7 +57,8 @@
   (potion-factory/render! game)
   #_(screen/render! game)
   (dialogue/render! game)
-  (hitbox/render! game))
+  (when (:debug? game)
+    (hitbox/render! game)))
 
 (defn clean! [game]
   (doto game

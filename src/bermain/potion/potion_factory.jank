@@ -23,20 +23,31 @@
    [odoyle.rules :as o]))
 
 (def deposit-line 530.0)
+(def ui-OK-x 480.0)
+(def ui-OK-y 20.0)
+(def ui-NG-dist 140.0)
+(defonce judgement (atom {:OK 0 :NG 0 ::story 0 :first-space false}))
 
-(defn route-inputs [{pressed? ::sdl3-input/pressed? :as game}]
-  (cond-> game
-    (::sdl3-input/space pressed?)
-    (world/insert-fact :root {::put-on-conveyor-belt true})))
+(defn route-inputs [{prev-pressed? ::sdl3-input/prev-pressed?
+                     pressed? ::sdl3-input/pressed? :as game}]
+  (let [first-space? (and (not (:first-space @judgement))
+                          (not (::sdl3-input/space prev-pressed?))
+                          (::sdl3-input/space pressed?))]
+    (when first-space?
+      (swap! judgement assoc :first-space true))
+    (cond-> game
+      (::sdl3-input/space pressed?)
+      (world/insert-fact :root {::put-on-conveyor-belt true})
+
+      first-space?
+      (world/insert-fact :root {::dialogue/control ::dialogue/next-dialogue})
+
+      (and (not (::sdl3-input/p prev-pressed?)) (::sdl3-input/p pressed?))
+      (update :debug? not))))
 
 (defn flow [game]
   (-> game
       (route-inputs)))
-
-(def ui-OK-x 480.0)
-(def ui-OK-y 20.0)
-(def ui-NG-dist 140.0)
-(defonce judgement (atom {:OK 0 :NG 0}))
 
 (defn default-metadata->areas [{:keys [width height]}]
   [[0.0 0.0 (float width) (float height)]])
@@ -112,21 +123,23 @@
      :when (:mouse-down? mouse) (input/mouse-l? mouse)
      :then
      (let [vec2           (cpp/unbox (:* cpp/vec2) vec2-box)
-           floating-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
-           duration       1.0]
+           floating-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))]
        (s-> session (o/insert esse-id {::original-y (.-y vec2)
                                        ::potion-state ::considering-to-destroy
                                        ::potion-health 2}))
        (doto (cpp/* floating-anime)
-         (cpp/thenRampTo (cpp/vec2 (.-x vec2) 228.0) duration (cpp/choreograph.EaseOutQuint)))
+         (cpp/thenRampTo (cpp/vec2 (.-x vec2) 228.0) 1.0 (cpp/choreograph.EaseOutQuint))
+         (cpp/thenHold (cpp/vec2 (.-x vec2) 228.0) 15.0))
        (let [floating-anime-box (cpp/box floating-anime)]
          (anime/play-episode! esse-id
            (fn [game id dt]
              (let [anime-time (get-in game [esse-id id ::time] 0.0)]
                (apply-choreo-vec2 floating-anime-box vec2-box anime-time)
-               (if (< anime-time duration)
+               (if (< anime-time (get-choreo-vec2-duration floating-anime-box))
                  (assoc-in game [esse-id id ::time] (+ anime-time dt))
-                 (-> game (anime/end-episode esse-id id))))))))]
+                 (-> game
+                     (anime/end-episode esse-id id)
+                     (world/insert-fact esse-id {::potion-state ::putting-it-back}))))))))]
 
     ::tapping-to-destroy
     [:what
@@ -138,12 +151,21 @@
      :when (:mouse-down? mouse) (input/mouse-l? mouse)
      :then
      (let [new-health (dec potion-health)
-           rand-angle (rand-nth [-10.0 -5.0 5.0 10.0])]
+           rand-angle (rand-nth [-10.0 -5.0 5.0 10.0])
+           session'   (o/insert session :root {::story ::next})]
        (if (> new-health 0)
-         (s-> session (o/insert esse-id {::esse/rotation rand-angle
-                                         ::potion-health new-health}))
-         (s-> session
+         (s-> session' (o/insert esse-id {::esse/rotation rand-angle
+                                          ::potion-health new-health}))
+         (s-> session'
               (utils/retract-many esse-id [::potion-state ::potion-health ::image/use ::hitbox/areas ::quality ::kind ::esse/vec2-box]))))]
+
+    ::adhoc-story
+    [:what
+     [:root ::story ::next]
+     :then
+     (let [story (::story (swap! judgement update ::story inc))]
+       (when (= (mod story 8) 0)
+         (s-> session (o/insert :root ::dialogue/control ::dialogue/next-dialogue))))]
 
     ::put-back-on-conveyor
     [:what
@@ -151,14 +173,21 @@
      [:root ::input/mouse mouse]
      [:root ::hitbox/esse-id-hit esse-id]
      [esse-id ::potion-state ::considering-to-destroy]
+     :when (:mouse-down? mouse) (input/mouse-r? mouse)
+     :then
+     (s-> session 
+          (o/insert :root {::story ::next})
+          (o/insert esse-id {::potion-state ::putting-it-back}))]
+
+    ::put-back-on-conveyor-anime
+    [:what
+     [esse-id ::potion-state ::putting-it-back]
      [esse-id ::esse/vec2-box vec2-box]
      [esse-id ::original-y previous-y]
-     :when (:mouse-down? mouse) (input/mouse-r? mouse)
      :then
      (s-> session
           (o/retract esse-id ::original-y)
-          (o/insert esse-id {::esse/rotation 0.0
-                             ::potion-state ::putting-it-back}))
+          (o/insert esse-id ::esse/rotation 0.0))
      (let [vec2            (cpp/unbox (:* cpp/vec2) vec2-box)
            returning-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
            duration        0.2]
@@ -207,11 +236,37 @@
   {:players {:ca {:name "Carmine"}
              :co {:name "Coral"}
              :tr {:name "Trixie"}}
-   :effects {}
-   :scripts [[:ca "I need to tap 2 times to destroy it"]]})
+   :effects {:funky (fn []
+                      (fn [{:keys [target time]}]
+                        (+ target (* 2 (cpp/sin (* 8.0 (float time)))))))}
+   :scripts [[:ca "Tap 2 times to destroy the potion"]
+             [:ca "The bad looking ones, I mean"]
+             [:ca "You can right click to put it back"]
+             [:ca "That's about it"]
+             [:ca "I had a story planned"]
+             [:ca "But I didn't manage to finish it"]
+             [:ca "Even though I thought it was a simple idea"]
+             [:ca "gamedev has a surprising amount of detail, huh?"]
+             [:ca "but still..."]
+             [:ca "this was a great progress"]
+             [:ca "compared to my last game jam"]
+             [:ca "honing my project management skills more"]
+             [:ca "..."]
+             [:ca "oh"]
+             [:ca " you're still here?" :+]
+             [:ca "thank you"]
+             [:ca "try holding space"]
+             [:ca [[" woah!" :funky]] :+]
+             [:ca "what are you doing!"]
+             [:ca "Idk if performance drop for you"]
+             [:ca "can you even see this?"]
+             [:ca "you can press P to toggle debug"]
+             [:ca "heh"]
+             [:ca ", this has been an experience" :+]
+             [:ca ["a" [" janky " :funky] "experience"]]]})
 
 (defn world-init [world _game]
-  (reset! judgement {:OK 0 :NG 0})
+  (reset! judgement {:OK 0 :NG 0 ::story 0})
   (-> (reduce-kv
        (fn [world image-id {:keys [image-path areas-fn]}]
          (o/insert world image-id (cond-> {::image/image-path image-path}

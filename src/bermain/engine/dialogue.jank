@@ -14,7 +14,8 @@
   [^(:* cpp/TTF_TextEngine) engine
    ^(:* cpp/TTF_Font) font
    dialogue-str]
-  (let [TTF_Text (cpp/TTF_CreateText engine font dialogue-str 0)
+  (let [TTF_Text (do (cpp/TTF_SetFontSize font 28.0)
+                     (cpp/TTF_CreateText engine font dialogue-str 0))
         w (cpp/int) h (cpp/int)
         _        (cpp/TTF_GetTextSize TTF_Text (cpp/& w) (cpp/& h))]
     {:TTF_Text (cpp/box TTF_Text)

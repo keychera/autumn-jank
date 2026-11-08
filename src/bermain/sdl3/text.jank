@@ -13,7 +13,7 @@
   (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) (:sdl-renderer-box game))
         engine   (must-be-some (cpp/TTF_CreateRendererTextEngine renderer))
         font     (must-be-some (cpp/TTF_OpenFont "res/fonts/CardboardCrown/CardboardCrown.ttf" 32))
-        text     (do (cpp/TTF_SetFontSize font 24.0)
+        text     (do (cpp/TTF_SetFontSize font 16.0)
                      (must-be-some (cpp/TTF_CreateText engine font "empty" 0)))
         text-ui  (do (cpp/TTF_SetFontSize font 36.0)
                      (must-be-some (cpp/TTF_CreateText engine font "42" 0)))]
