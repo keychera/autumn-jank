@@ -63,3 +63,15 @@ woes
 10. naming binding the same name as type, runtime error
 11. libunwind:      pc not in table, pc=0x14D23563F3F (windows woes, ikappakiさん、頑張れ！！ https://github.com/lhames/llvm-project/pull/5 , https://github.com/llvm/llvm-project/issues/163503)
 12. sometimes I need to manually delete target/_cache or it compiles error (maybe lein jank do something about this?)
+13. we thought we need to do this
+```clojure
+(defn get-choreo-vec2-duration
+  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
+  (.getDuration (cpp/* choreo-vec2)))
+```
+but we can do this
+```clojure
+(defn get-choreo-vec2-duration
+  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
+  (.getDuration choreo-vec2))
+```

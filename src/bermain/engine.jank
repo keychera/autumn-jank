@@ -52,8 +52,8 @@
       (potion-factory/flow)))
 
 (defn render! [game]
-  #_(potion-factory/render! game)
-  (screen/render! game)
+  (potion-factory/render! game)
+  #_(screen/render! game)
   (dialogue/render! game)
   (hitbox/render! game))
 
