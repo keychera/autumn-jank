@@ -15,7 +15,7 @@
   (o/ruleset
    {::menu
     [:what
-     [menu-id ::menu true]
+     [menu-id ::show-menu? true]
      [menu-id ::esse/vec2-box vec2-box]
      [menu-id ::hitbox/areas areas]]}))
 
@@ -29,10 +29,10 @@
 (defn world-init [world {{:keys [width height main-scale]} :windows}]
   (let [hit-area [[-10.0 0.0 130.0 48.0]]]
     (-> world
-        (insert-facts [:start {::menu true
+        (insert-facts [:start {::show-menu? true
                                ::esse/vec2-box (box-vec2 (float (+ (/ width 2 main-scale) 120)) (float (+ (/ height 2 main-scale) 100)))
                                ::hitbox/areas hit-area}]
-                      [:options {::menu true
+                      [:options {::show-menu? true
                                  ::esse/vec2-box (box-vec2 (float (+ (/ width 2 main-scale) 120)) (float (+ (/ height 2 main-scale) 150)))
                                  ::hitbox/areas hit-area}]))))
 
