@@ -64,14 +64,25 @@ woes
 11. libunwind:      pc not in table, pc=0x14D23563F3F (windows woes, ikappakiさん、頑張れ！！ https://github.com/lhames/llvm-project/pull/5 , https://github.com/llvm/llvm-project/issues/163503)
 12. sometimes I need to manually delete target/_cache or it compiles error (maybe lein jank do something about this?)
 13. we thought we need to do this
-```clojure
-(defn get-choreo-vec2-duration
-  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
-  (.getDuration (cpp/* choreo-vec2)))
-```
-but we can do this
-```clojure
-(defn get-choreo-vec2-duration
-  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
-  (.getDuration choreo-vec2))
-```
+    ```clojure
+    (defn get-choreo-vec2-duration
+      [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
+      (.getDuration (cpp/* choreo-vec2)))
+    ```
+    but we can do this
+    ```clojure
+    (defn get-choreo-vec2-duration
+      [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
+      (.getDuration choreo-vec2))
+    ```
+14. somehow we understand more what polymorphic means through making this
+    ```clojure
+    (defn mouse-l? [mouse]
+      (= (bit-and (:button-flags mouse) cpp/SDL_BUTTON_LMASK) cpp/SDL_BUTTON_LMASK))
+    ```
+  
+    which we initially use macros like this and fail
+    ```clojure
+    (defmacro mouse-l? [button-flags]
+      `(cpp/== (cpp/& ~button-flags cpp/SDL_BUTTON_LMASK) cpp/SDL_BUTTON_LMASK))
+    ```

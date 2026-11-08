@@ -5,6 +5,12 @@
    [bermain.engine.world :as world]
    [odoyle.rules :as o]))
 
+(defn mouse-l? [mouse]
+  (= (bit-and (:button-flags mouse) cpp/SDL_BUTTON_LMASK) cpp/SDL_BUTTON_LMASK))
+
+(defn mouse-r? [mouse]
+  (= (bit-and (:button-flags mouse) cpp/SDL_BUTTON_RMASK) cpp/SDL_BUTTON_RMASK))
+
 (def rules
   (o/ruleset
    {::mouse [:what [:root ::mouse mouse]]
@@ -30,13 +36,5 @@
 (defn init [game]
   (world/establish game rules world-init))
 
-(defn flow [{{main-scale :main-scale} :windows :as game}]
-  (let [mouse-x (cpp/float)
-        mouse-y (cpp/float)
-        _ (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
-        mouse-x (/ mouse-x main-scale)
-        mouse-y (/ mouse-y main-scale)]
-    (-> game
-        (world/insert-fact :root {::mouse {:mouse-down? (:mouse-down? game)
-                                           :mouse-x mouse-x
-                                           :mouse-y mouse-y}}))))
+(defn flow [{mouse :mouse :as game}]
+  (-> game (world/insert-fact :root {::mouse mouse})))

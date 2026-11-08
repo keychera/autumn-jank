@@ -7,6 +7,17 @@
    ::d     cpp/SDL_SCANCODE_D
    ::space cpp/SDL_SCANCODE_SPACE})
 
+(defn process-mouse [{{main-scale :main-scale} :windows :as game}]
+  (let [mouse-x      (cpp/float)
+        mouse-y      (cpp/float)
+        button-flags (cpp/SDL_GetMouseState (cpp/& mouse-x) (cpp/& mouse-y))
+        mouse-x      (/ mouse-x main-scale)
+        mouse-y      (/ mouse-y main-scale)]
+    (update game :mouse assoc
+            :button-flags button-flags
+            :mouse-x mouse-x
+            :mouse-y mouse-y)))
+
 (defn process-input [{:keys [kb-state-box] :as prev-game}]
   (let [kb-state (cpp/unbox (:* (:const cpp/bool)) kb-state-box)
         game     (assoc prev-game ::pressed? #{})]
@@ -31,10 +42,12 @@
             (recur (assoc game' :end? true))
 
             (cpp/== event-type cpp/SDL_EVENT_MOUSE_BUTTON_DOWN)
-            (recur (assoc game' :mouse-down? true))
+            (recur (assoc-in game' [:mouse :mouse-down?] true))
 
             (cpp/== event-type cpp/SDL_EVENT_MOUSE_BUTTON_UP)
-            (recur (assoc game' :mouse-down? false))
+            (recur (assoc-in game' [:mouse :mouse-down?] false))
 
             :else (recur game')))
-        (process-input game')))))
+        (-> game'
+            (process-input)
+            (process-mouse))))))

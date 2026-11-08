@@ -162,7 +162,7 @@
      [:root ::hitbox/esse-id-hit esse-id]
      [esse-id ::potion-state ::on-conveyor]
      [esse-id ::esse/vec2-box vec2-box]
-     :when (:mouse-down? mouse)
+     :when (:mouse-down? mouse) (input/mouse-l? mouse)
      :then
      (s-> session
           (o/insert esse-id {::potion-state ::considering-to-destroy}))]
