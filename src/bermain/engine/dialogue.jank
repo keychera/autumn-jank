@@ -128,7 +128,7 @@
 
 (defn init [game]
   (anime/play-episode! :dialogue-tick
-    (fn [game dt] (dialogue-tick game dt)))
+    (fn [game _id dt] (dialogue-tick game dt)))
   (world/establish game rules world-init))
 
 (defn render!

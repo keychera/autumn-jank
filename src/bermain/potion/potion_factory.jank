@@ -129,6 +129,9 @@
      [esse-id ::esse/vec2-box vec2-box]
      [esse-id ::kind ::potion]
      [image-id ::image/metadata metadata]
+     :then
+     (let [previous-y (.-y (cpp/unbox (:* cpp/vec2) vec2-box))]
+       (s-> session (o/insert esse-id {::previous-y previous-y})))
      :then-finally
      (let [all-potions (o/query-all session ::potions-to-render)]
        (s-> session (o/insert :root ::all-potions all-potions)))]
@@ -148,7 +151,7 @@
      [esse-id ::esse/vec2-box vec2-box]
      :then
      (anime/play-episode! esse-id
-       (fn [game dt]
+       (fn [game _id dt]
          (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
            (if (< (.-x vec2) deposit-line)
              (do (cpp/+= (.-x vec2) (* 74.0 dt)) game)
@@ -164,31 +167,50 @@
      [esse-id ::esse/vec2-box vec2-box]
      :when (:mouse-down? mouse) (input/mouse-l? mouse)
      :then
-     (s-> session
-          (o/insert esse-id {::potion-state ::considering-to-destroy}))]
-
-    ::considering-to-destroy-anime
-    [:what
-     [esse-id ::kind ::potion]
-     [esse-id ::potion-state ::considering-to-destroy]
-     [esse-id ::esse/vec2-box vec2-box]
-     :then
      (let [vec2           (cpp/unbox (:* cpp/vec2) vec2-box)
            floating-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
            duration       1.0]
+       (s-> session (o/insert esse-id {::potion-state ::considering-to-destroy}))
        (doto (cpp/* floating-anime)
          (cpp/thenRampTo (cpp/vec2 (.-x vec2) 228.0) duration (cpp/choreograph.EaseOutQuint)))
        (let [floating-anime-box (cpp/box floating-anime)]
          (anime/play-episode! esse-id
-           (fn [game dt]
-             (let [anime-time (get-in game [esse-id ::time] 0.0)]
+           (fn [game id dt]
+             (let [anime-time (get-in game [esse-id id ::time] 0.0)]
                (if (< anime-time duration)
                  (do (apply-choreo-vec2 floating-anime-box vec2-box anime-time)
-                     (assoc-in game [esse-id ::time] (+ anime-time dt)))
+                     (assoc-in game [esse-id id ::time] (+ anime-time dt)))
                  (-> game
-                     (anime/end-episode esse-id))))))))]
+                     (anime/end-episode esse-id id))))))))]
 
-    ::deposit-anime
+    ::put-back-on-conveyor
+    [:what
+     [:root ::input/mouse-state ::input/idle]
+     [:root ::input/mouse mouse]
+     [:root ::hitbox/esse-id-hit esse-id]
+     [esse-id ::potion-state ::considering-to-destroy]
+     [esse-id ::esse/vec2-box vec2-box]
+     [esse-id ::previous-y previous-y]
+     :when (:mouse-down? mouse) (input/mouse-r? mouse)
+     :then
+     (s-> session (o/insert esse-id {::potion-state ::putting-it-back}))
+     (let [vec2            (cpp/unbox (:* cpp/vec2) vec2-box)
+           returning-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
+           duration        0.2]
+       (doto (cpp/* returning-anime)
+         (cpp/thenRampTo (cpp/vec2 (.-x vec2) previous-y) duration))
+       (let [returning-anime-box (cpp/box returning-anime)]
+         (anime/play-episode! esse-id
+           (fn [game id dt]
+             (let [anime-time (get-in game [esse-id id ::time] 0.0)]
+               (if (< anime-time duration)
+                 (do (apply-choreo-vec2 returning-anime-box vec2-box anime-time)
+                     (assoc-in game [esse-id id ::time] (+ anime-time dt)))
+                 (-> game
+                     (world/insert-fact esse-id {::potion-state ::on-conveyor})
+                     (anime/end-episode esse-id id))))))))]
+
+    ::depositing
     [:what
      [esse-id ::kind ::potion]
      [esse-id ::potion-state ::depositing]
@@ -206,7 +228,7 @@
        (s-> session (o/retract esse-id ::potion-state))
        (let [deposit-anime-box (cpp/box deposit-anime)]
          (anime/play-episode! esse-id
-           (fn [game dt]
+           (fn [game id dt]
              (let [anime-time (get-in game [esse-id ::time] 0.0)]
                (if (< anime-time (get-choreo-vec2-duration deposit-anime-box))
                  (do (apply-choreo-vec2 deposit-anime-box vec2-box anime-time)
@@ -214,11 +236,11 @@
                  (do (swap! judgement update quality + 1)
                      (-> game
                          (world/retract-many esse-id [::image/use ::hitbox/areas ::quality ::kind ::esse/vec2-box])
-                         (anime/end-episode esse-id)))))))))]}))
+                         (anime/end-episode esse-id id)))))))))]}))
 
 (defn init [game]
   (anime/play-episode! :potion-periodic
-    (fn [game dt]
+    (fn [game _id dt]
       (let [potion-time (get-in game [:potion-periodic ::time] 0.0)]
         (if (< potion-time 0.5)
           (assoc-in game [:potion-periodic ::time] (+ potion-time dt))

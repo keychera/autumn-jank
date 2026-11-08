@@ -8,24 +8,26 @@
   "play an episode of anime-fn (fn [game dt] game) that will be run by anime/flow
    anime-fn MUST return game or well you lose the game."
   [esse-id anime-fn]
-  (swap! anime-db assoc-in [esse-id ::anime-fn] anime-fn))
+  (let [id (random-uuid)]
+    (swap! anime-db assoc esse-id {::id id
+                                   ::anime-fn anime-fn})))
 
 (defn end-episode
   "end-episode of esse-id anime given a game.
    unlike play-episode! this is only flag the anime to end during anime/flow"
-  [game esse-id]
-  (assoc game esse-id ::ending))
+  [game esse-id id]
+  (assoc-in game [esse-id id] ::ending))
 
 (defn flow
   [{::time/keys [delta speed] :as game}]
   (let [animes @anime-db
         dt (* delta speed)]
     (reduce-kv
-     (fn [game' esse-id {:keys [::anime-fn]}]
-       (if (= (get game' esse-id) ::ending)
+     (fn [game' esse-id {:keys [::id ::anime-fn]}]
+       (if (= (get-in game' [esse-id id]) ::ending)
          (do (swap! anime-db dissoc esse-id)
-             (dissoc game' esse-id))
-         (anime-fn game' dt)))
+             (update game' esse-id dissoc id))
+         (anime-fn game' id dt)))
      game animes)))
 
 (defn clean! [_game]
