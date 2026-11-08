@@ -34,7 +34,7 @@
 
       #_game
       (stage/init)
-      (screen/init)
+      #_(screen/init)
       (potion-factory/init)
 
       (#_must-be-last world/init)))

@@ -6,6 +6,7 @@
    [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.sdl3.error :refer [must-be-some must-be-true]]
+   [bermain.sdl3.time :as time]
    [odoyle.rules :as o]))
 
 (defn playing? [^(:* cpp/MIX_Track) track]
@@ -14,10 +15,14 @@
 (defn set-track [^(:* cpp/MIX_Track) track ^(:* cpp/MIX_Audio) audio]
   (cpp/MIX_SetTrackAudio track audio))
 
-(defn play [^(:* cpp/MIX_Track) track]
-  (cpp/MIX_PlayTrack track 0))
+(defn play
+  ([^(:* cpp/MIX_Track) track]
+   (cpp/MIX_PlayTrack track 0))
+  ;; you can pass values like that...?? props is SDL_PropertiesID
+  ([^(:* cpp/MIX_Track) track props]
+   (cpp/MIX_PlayTrack track props)))
 
-(def audio-atom (atom {}))
+(defonce audio-atom (atom {}))
 
 (def rules
   (o/ruleset
@@ -41,11 +46,17 @@
      :then
      (let [mixer     (cpp/unbox (:* cpp/MIX_Mixer) mixer-box)
            bgm       (:audio (get @audio-atom esse-id))
-           bgm-track (cpp/box (must-be-some (cpp/MIX_CreateTrack mixer)))]
+           bgm-track (cpp/box (must-be-some (cpp/MIX_CreateTrack mixer)))
+           props     (doto (cpp/SDL_CreateProperties)
+                       (cpp/SDL_SetNumberProperty cpp/MIX_PROP_PLAY_LOOPS_NUMBER -1))]
        (set-track bgm-track bgm)
-       (play bgm-track))]}))
+       (play bgm-track props)
+       (cpp/SDL_DestroyProperties props))]
 
-(defn world-init [world {:keys [mixer-box]}]
+    ::play-tututu
+    [:what [esse-id ::play-tututu true]]}))
+
+(defn world-init [world {:keys [::mixer-box]}]
   (-> world
       (o/insert :root ::mixer-box mixer-box)
       (o/insert :bgm-a {::audio-path "res/pixelspheremegamix.ogg"
@@ -54,13 +65,33 @@
 (defn init [game]
   (must-be-true (cpp/MIX_Init))
 
-  (let [mixer (must-be-some (cpp/MIX_CreateMixerDevice cpp/SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK cpp/nullptr))]
-    (-> (assoc game :mixer-box (cpp/box mixer))
+  (let [mixer (must-be-some (cpp/MIX_CreateMixerDevice cpp/SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK cpp/nullptr))
+        dialogue-sfx   (cpp/box (must-be-some (cpp/MIX_LoadAudio mixer "res/click2.ogg" true)))
+        sfx-track-pool (letfn [(create-dialogue-sfx-track []
+                                 (let [sfx-track (cpp/box (must-be-some (cpp/MIX_CreateTrack mixer)))]
+                                   (set-track sfx-track dialogue-sfx)
+                                   sfx-track))]
+                         (vec (take 4 (repeatedly create-dialogue-sfx-track))))]
+    (-> (assoc game
+               ::mixer-box (cpp/box mixer)
+               ::sfx-track-pool sfx-track-pool
+               ::time-last-sfx-played 0)
         (world/establish rules world-init))))
+
+(defn play-tututu
+  [{:keys [::sfx-track-pool ::time-last-sfx-played]
+    current ::time/total :as game}]
+  (if (> (- current time-last-sfx-played) 0.1)
+    (do (when-let [sfx-track (first (remove playing? sfx-track-pool))]
+          (play sfx-track))
+        (assoc game ::time-last-sfx-played current))
+    game))
 
 (defn flow
   [game]
-  game)
+  (if (world/ask-one game ::play-tututu)
+    (play-tututu game)
+    game))
 
 (defn clean! [_game]
   (cpp/MIX_Quit)

@@ -135,12 +135,13 @@
   [{world ::world/this
     tt ::time/total
     :as game}]
-  (let [text (cpp/unbox (:* cpp/TTF_Text) (::text/text game))]
+  (let [base-x 234.0 base-y 220.0
+        text (cpp/unbox (:* cpp/TTF_Text) (::text/text game))]
     (when-let [{:keys [player dialogue-pieces progress]} (query-one world ::animate-dialogue)]
       (doto text
         (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
         (cpp/TTF_SetTextString (-> player :name) 0)
-        (cpp/TTF_DrawRendererText 24.0 260.0))
+        (cpp/TTF_DrawRendererText base-x base-y))
 
       (loop [[piece & remains] dialogue-pieces
              local-progress 0
@@ -151,10 +152,10 @@
                 current  (- progress local-progress)
                 dialogue (subs dialogue 0 (min (max current 0) length))
 
-                x-pos    (+ 30.0 local-width)
+                x-pos    (+ base-x 6.0 local-width)
                 y-pos    (if effect-fn
-                           (effect-fn {:target 290.0 :time tt})
-                           290.0)]
+                           (effect-fn {:target (+ base-y 30.0) :time tt})
+                           (+ base-y 30.0))]
             (doto TTF_Text
               (cpp/TTF_SetTextColor 25 25 25 cpp/SDL_ALPHA_OPAQUE)
               (cpp/TTF_SetTextString dialogue 0)

@@ -86,3 +86,12 @@ woes
     (defmacro mouse-l? [button-flags]
       `(cpp/== (cpp/& ~button-flags cpp/SDL_BUTTON_LMASK) cpp/SDL_BUTTON_LMASK))
     ```
+15. huh?
+    ```clojure
+    (defn play
+      ([^(:* cpp/MIX_Track) track]
+      (cpp/MIX_PlayTrack track 0))
+      ;; you can pass values like that...?? props is SDL_PropertiesID
+      ([^(:* cpp/MIX_Track) track props]
+      (cpp/MIX_PlayTrack track props)))
+    ```

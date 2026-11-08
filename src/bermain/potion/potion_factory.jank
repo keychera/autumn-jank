@@ -9,6 +9,7 @@
    [bermain.engine.anime :as anime]
    [bermain.engine.choreography :refer [apply-choreo-vec2
                                         get-choreo-vec2-duration]]
+   [bermain.engine.dialogue :as dialogue]
    [bermain.engine.hitbox :as hitbox]
    [bermain.engine.input :as input]
    [bermain.engine.stage :as stage]
@@ -39,52 +40,6 @@
 
 (defn default-metadata->areas [{:keys [width height]}]
   [[0.0 0.0 (float width) (float height)]])
-
-(defn world-init [world _game]
-  (reset! judgement {:OK 0 :NG 0})
-  (-> (reduce-kv
-       (fn [world image-id {:keys [image-path areas-fn]}]
-         (o/insert world image-id (cond-> {::image/image-path image-path}
-                                    areas-fn (assoc ::areas-fn areas-fn))))
-       world {:count-OK {:image-path "res/images/countOK.PNG"}
-              :count-NG {:image-path "res/images/countNG.PNG"}
-              :carmine-img {:image-path "res/images/carmine.PNG"}
-              :conveyor-img {:image-path "res/images/conveyor.PNG"}
-              :potion1-img {:image-path "res/images/potion1.PNG"
-                            :areas-fn (fn [{:keys [width height]}]
-                                        (let [width    (float width)
-                                              height-1 (float (/ height 1.8))
-                                              height-2 (- height height-1)
-                                              height-3 (/ height-2 2)
-                                              height-4 (+ height-1 height-3)]
-                                          [[30.0 0.0 30.0 height-1]
-                                           [20.0 height-1 60.0 height-3]
-                                           [0.0 height-4 width height-3]]))}
-              :potion2-img {:image-path "res/images/potion2.PNG" :areas-fn default-metadata->areas}
-              :potion1NG-img {:image-path "res/images/potion1NG.PNG"
-                              :areas-fn (fn [{:keys [width height]}]
-                                          (let [width    (float width)
-                                                height-1 (float (/ height 2.5))
-                                                height-2 (- height height-1)
-                                                height-3 (/ height-2 2)
-                                                height-4 (+ height-1 height-3)]
-                                            [[30.0 0.0 30.0 height-1]
-                                             [20.0 height-1 60.0 height-3]
-                                             [0.0 height-4 width height-3]]))}
-              :potion2NG-img {:image-path "res/images/potion2NG.PNG" :areas-fn default-metadata->areas}})
-      (insert-facts
-       [:count-OK {::image/use :count-OK
-                   ::esse/vec2-box (box-vec2 ui-OK-x ui-OK-y)
-                   ::layer 0}]
-       [:count-NG {::image/use :count-NG
-                   ::esse/vec2-box (box-vec2 (+ ui-OK-x ui-NG-dist) ui-OK-y)
-                   ::layer 0}]
-       [:carmine {::image/use :carmine-img
-                  ::esse/vec2-box (box-vec2 30.0 50.0)
-                  ::layer 0}]
-       [:conveyor {::image/use :conveyor-img
-                   ::esse/vec2-box (box-vec2 0.0 320.0)
-                   ::layer 0}])))
 
 (def rules
   (o/ruleset
@@ -161,7 +116,7 @@
            duration       1.0]
        (s-> session (o/insert esse-id {::original-y (.-y vec2)
                                        ::potion-state ::considering-to-destroy
-                                       ::potion-health 3}))
+                                       ::potion-health 2}))
        (doto (cpp/* floating-anime)
          (cpp/thenRampTo (cpp/vec2 (.-x vec2) 228.0) duration (cpp/choreograph.EaseOutQuint)))
        (let [floating-anime-box (cpp/box floating-anime)]
@@ -247,6 +202,64 @@
                      (-> game
                          (world/retract-many esse-id [::image/use ::hitbox/areas ::quality ::kind ::esse/vec2-box])
                          (anime/end-episode esse-id id)))))))))]}))
+
+(def carmine-play
+  {:players {:ca {:name "Carmine"}
+             :co {:name "Coral"}
+             :tr {:name "Trixie"}}
+   :effects {}
+   :scripts [[:ca "I need to tap 2 times to destroy it"]]})
+
+(defn world-init [world _game]
+  (reset! judgement {:OK 0 :NG 0})
+  (-> (reduce-kv
+       (fn [world image-id {:keys [image-path areas-fn]}]
+         (o/insert world image-id (cond-> {::image/image-path image-path}
+                                    areas-fn (assoc ::areas-fn areas-fn))))
+       world {:count-OK {:image-path "res/images/countOK.PNG"}
+              :count-NG {:image-path "res/images/countNG.PNG"}
+              :carmine-img {:image-path "res/images/carmine.PNG"}
+              :conveyor-img {:image-path "res/images/conveyor.PNG"}
+              :potion1-img {:image-path "res/images/potion1.PNG"
+                            :areas-fn (fn [{:keys [width height]}]
+                                        (let [width    (float width)
+                                              height-1 (float (/ height 1.8))
+                                              height-2 (- height height-1)
+                                              height-3 (/ height-2 2)
+                                              height-4 (+ height-1 height-3)]
+                                          [[30.0 0.0 30.0 height-1]
+                                           [20.0 height-1 60.0 height-3]
+                                           [0.0 height-4 width height-3]]))}
+              :potion2-img {:image-path "res/images/potion2.PNG" :areas-fn default-metadata->areas}
+              :potion1NG-img {:image-path "res/images/potion1NG.PNG"
+                              :areas-fn (fn [{:keys [width height]}]
+                                          (let [width    (float width)
+                                                height-1 (float (/ height 2.5))
+                                                height-2 (- height height-1)
+                                                height-3 (/ height-2 2)
+                                                height-4 (+ height-1 height-3)]
+                                            [[30.0 0.0 30.0 height-1]
+                                             [20.0 height-1 60.0 height-3]
+                                             [0.0 height-4 width height-3]]))}
+              :potion2NG-img {:image-path "res/images/potion2NG.PNG" :areas-fn default-metadata->areas}})
+      (insert-facts
+       [:root {::dialogue/tick-length 0.02
+               ::dialogue/dialogue ""
+               ::dialogue/dialogue-progress 0
+               ::dialogue/play carmine-play
+               ::dialogue/play-progress 0}]
+       [:count-OK {::image/use :count-OK
+                   ::esse/vec2-box (box-vec2 ui-OK-x ui-OK-y)
+                   ::layer 0}]
+       [:count-NG {::image/use :count-NG
+                   ::esse/vec2-box (box-vec2 (+ ui-OK-x ui-NG-dist) ui-OK-y)
+                   ::layer 0}]
+       [:carmine {::image/use :carmine-img
+                  ::esse/vec2-box (box-vec2 30.0 50.0)
+                  ::layer 0}]
+       [:conveyor {::image/use :conveyor-img
+                   ::esse/vec2-box (box-vec2 0.0 320.0)
+                   ::layer 0}])))
 
 (defn init [game]
   (anime/play-episode! :potion-periodic
