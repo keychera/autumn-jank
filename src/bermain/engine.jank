@@ -7,6 +7,7 @@
    [bermain.engine.hitbox :as hitbox]
    [bermain.engine.input :as input]
    [bermain.engine.parsl :as parsl]
+   [bermain.engine.stage :as stage]
    [bermain.engine.world :as world]
    [bermain.potion.potion-factory :as potion-factory]
    [bermain.potion.screen :as screen]
@@ -32,6 +33,7 @@
       (dialogue/init)
 
       #_game
+      (stage/init)
       (screen/init)
       (potion-factory/init)
 

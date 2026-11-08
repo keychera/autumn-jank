@@ -1,0 +1,58 @@
+(ns bermain.engine.stage
+  (:include "extra.hpp")
+  (:require
+   [bermain.engine.anime :as anime]
+   [bermain.engine.choreography :refer [apply-choreo-vec2]]
+   [bermain.engine.utils :refer [s->]]
+   [bermain.engine.world :as world]
+   [bermain.esse :refer [box-vec2]]
+   [odoyle.rules :as o]))
+
+(defn pos-on-stage
+  [game
+   ^(:* cpp/vec2) avec2]
+  (let [camera-vec2-box (:camera-vec2-box (world/ask-one game ::camera))
+        camera-vec2     (cpp/unbox (:* cpp/vec2) camera-vec2-box)]
+    [(+ (.-x camera-vec2) (.-x avec2))
+     (+ (.-y camera-vec2) (.-y avec2))]))
+
+(def rules
+  (o/ruleset
+   {::camera
+    [:what
+     [:root ::camera-vec2-box camera-vec2-box]]
+
+    ::move-camera
+    [:what
+     [:root ::camera-action camera-action]
+     [:root ::camera-vec2-box camera-vec2-box]
+     :then
+     (let [{:keys [x y duration]} camera-action
+           camera-vec2            (cpp/unbox (:* cpp/vec2) camera-vec2-box)
+           camera-anime           (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* camera-vec2))]
+       (s-> session (o/retract :root ::camera-action))
+       (doto (cpp/* camera-anime)
+         (cpp/thenRampTo (cpp/vec2 x y) (float duration) (cpp/choreograph.EaseInOutQuint)))
+       (let [camera-anime-box (cpp/box camera-anime)]
+         (anime/play-episode! ::camera
+           (fn [game id dt]
+             (let [anime-time (get-in game [::camera id ::time] 0.0)]
+               (apply-choreo-vec2 camera-anime-box camera-vec2-box anime-time)
+               (if (< anime-time duration)
+                 (assoc-in game [::camera id ::time] (+ anime-time dt))
+                 (-> game (anime/end-episode ::camera id))))))))]}))
+
+(defn world-init [world _game]
+  (-> world
+      (o/insert :root {::camera-vec2-box (box-vec2 0.0 0.0)})))
+
+(defn init [game]
+  (world/establish game rules world-init))
+
+(comment
+  (require '[bermain.engine.game-mutator :refer [inject-facts!]])
+
+  (inject-facts!
+   [:root {::camera-action {:x -00.0 :y 0.0 :duration 1.0}}])
+
+  :-)

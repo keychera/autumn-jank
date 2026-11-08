@@ -7,16 +7,19 @@
    "choreograph/Easing.h")
   (:require
    [bermain.engine.anime :as anime]
+   [bermain.engine.choreography :refer [apply-choreo-vec2
+                                        get-choreo-vec2-duration]]
+   [bermain.engine.hitbox :as hitbox]
    [bermain.engine.input :as input]
-   [bermain.engine.utils :as utils :refer [s-> insert-facts]]
+   [bermain.engine.stage :as stage]
+   [bermain.engine.utils :as utils :refer [insert-facts s->]]
    [bermain.engine.world :as world]
    [bermain.esse :as esse :refer [box-vec2]]
    [bermain.sdl3.image :as image]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
-   [odoyle.rules :as o]
-   [bermain.engine.hitbox :as hitbox]))
+   [odoyle.rules :as o]))
 
 (def deposit-line 530.0)
 
@@ -70,7 +73,6 @@
                                              [0.0 height-4 width height-3]]))}
               :potion2NG-img {:image-path "res/images/potion2NG.PNG" :areas-fn default-metadata->areas}})
       (insert-facts
-       [:root {:stage/camera-vec2-box (box-vec2 0.0 0.0)}]
        [:count-OK {::image/use :count-OK
                    ::esse/vec2-box (box-vec2 ui-OK-x ui-OK-y)
                    ::layer 0}]
@@ -84,46 +86,9 @@
                    ::esse/vec2-box (box-vec2 0.0 320.0)
                    ::layer 0}])))
 
-(defn get-choreo-vec2-duration
-  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
-  (.getDuration choreo-vec2))
-
-(defn apply-choreo-vec2
-  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2
-   ^(:* cpp/vec2) target-vec2
-   anime-time]
-  (let [vec2' (.getValue choreo-vec2 anime-time)]
-    (cpp/= (.-x target-vec2) (.-x vec2'))
-    (cpp/= (.-y target-vec2) (.-y vec2')))
-  :done)
-
 (def rules
   (o/ruleset
-   {::stage
-    [:what
-     [:root :stage/camera-vec2-box camera-vec2-box]]
-
-    ::move-camera
-    [:what
-     [:root :stage/camera-action camera-action]
-     [:root :stage/camera-vec2-box camera-vec2-box]
-     :then
-     (let [{:keys [x y duration]} camera-action
-           camera-vec2            (cpp/unbox (:* cpp/vec2) camera-vec2-box)
-           camera-anime           (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* camera-vec2))]
-       (s-> session (o/retract :root :stage/camera-action))
-       (doto (cpp/* camera-anime)
-         (cpp/thenRampTo (cpp/vec2 x y) (float duration) (cpp/choreograph.EaseInOutQuint)))
-       (let [camera-anime-box (cpp/box camera-anime)]
-         (anime/play-episode! :stage/camera
-           (fn [game id dt]
-             (let [anime-time (get-in game [:stage/camera id ::time] 0.0)]
-               (apply-choreo-vec2 camera-anime-box camera-vec2-box anime-time)
-               (if (< anime-time duration)
-                 (assoc-in game [:stage/camera id ::time] (+ anime-time dt))
-                 (-> game (anime/end-episode :stage/camera id))))))))]
-
-    ::put-on-conveyor-belt
+   {::put-on-conveyor-belt
     [:what
      [:root ::put-on-conveyor-belt true]
      :then
@@ -297,26 +262,22 @@
       (world/establish rules world-init)))
 
 (defn render-this
-  [^(:* cpp/SDL_Renderer) sdl-renderer
-   ^(:* cpp/vec2) camera
+  [{sdl-renderer-box :sdl-renderer-box :as game}
    {:keys [image-id vec2-box rotation]}]
   (when-let [texture-box (get @image/textures-atom image-id)]
-    (let [vec2     (cpp/unbox (:* cpp/vec2) vec2-box)
-          x        (+ (.-x vec2) (.-x camera))
-          y        (+ (.-y vec2) (.-y camera))
+    (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+          [x y]    (stage/pos-on-stage game vec2-box)
           texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
           src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
           dst-rest (cpp/SDL_FRect x y (.-w texture) (.-h texture))]
       (if rotation
-        (cpp/SDL_RenderTextureRotated sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest) rotation cpp/nullptr cpp/SDL_FLIP_NONE)
-        (cpp/SDL_RenderTexture sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest))))))
+        (cpp/SDL_RenderTextureRotated renderer texture (cpp/& src-rect) (cpp/& dst-rest) rotation cpp/nullptr cpp/SDL_FLIP_NONE)
+        (cpp/SDL_RenderTexture renderer texture (cpp/& src-rect) (cpp/& dst-rest))))))
 
 (defn render!
-  [{sdl-renderer-box :sdl-renderer-box
-    text-ui-box ::text/text-ui
+  [{text-ui-box ::text/text-ui
     :as game}]
-  (let [{:keys [camera-vec2-box]} (world/ask-one game ::stage)
-        potions  (->> (world/ask-many game ::potions-to-render)
+  (let [potions  (->> (world/ask-many game ::potions-to-render)
                       (sort-by (fn [{vec2-box :vec2-box metadata :metadata}]
                                  (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
                                    (+ (.-y vec2) (:height metadata))))))]
@@ -336,10 +297,10 @@
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
-        (render-this sdl-renderer-box camera-vec2-box image)))
+        (render-this game image)))
 
     (doseq [potion potions]
-      (render-this sdl-renderer-box camera-vec2-box potion))))
+      (render-this game potion))))
 
 (comment
   (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]]
@@ -354,8 +315,8 @@
     (println fact))
 
   (inject-facts!
-   [:root {:stage/camera-action {:x -0.0 :y 0.0
-                                 :duration 1.0}}])
+   [:root {::stage/camera-action {:x -0.0 :y 0.0
+                                  :duration 1.0}}])
 
   (assoc-game! ::time/speed 0.0)
 

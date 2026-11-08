@@ -1,0 +1,18 @@
+(ns bermain.engine.choreography
+  (:include
+   "extra.hpp"
+   "choreograph/Choreograph.h"
+   "choreograph/Easing.h"))
+
+(defn get-choreo-vec2-duration
+  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2]
+  (.getDuration choreo-vec2))
+
+(defn apply-choreo-vec2
+  [^(:* (choreograph.Sequence cpp/vec2)) choreo-vec2
+   ^(:* cpp/vec2) target-vec2
+   anime-time]
+  (let [vec2' (.getValue choreo-vec2 anime-time)]
+    (cpp/= (.-x target-vec2) (.-x vec2'))
+    (cpp/= (.-y target-vec2) (.-y vec2')))
+  :done)
