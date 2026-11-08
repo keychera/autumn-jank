@@ -1,6 +1,8 @@
-# autumn jank
+# Potion Inspector
 
-a game for [Autumn Lisp Game Jam 2026](https://itch.io/jam/autumn-lisp-game-jam-2026/) 
+a game for [Autumn Lisp Game Jam 2026](https://heritonaru.itch.io/potion-inspector)
+
+![potion inspector](potion.gif)
 
 ## build
 
