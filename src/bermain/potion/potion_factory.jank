@@ -107,11 +107,13 @@
                     [:potion2-img :OK]
                     [:potion1NG-img :NG]
                     [:potion2NG-img :NG]]
-           rand-y  [-20 0 20]
+           rand-y  (+ 335.0 (rand-nth [-20 0 20]))
            [img quality] (rand-nth potions)]
        (s-> session
             (o/insert potion-id {::image/use img
-                                 ::esse/vec2-box (box-vec2 -100.0 (+ 335.0 (rand-nth rand-y)))
+                                 ::esse/vec2-box (box-vec2 -100.0 rand-y)
+                                 ::esse/rotation 0.0
+                                 ::original-y rand-y
                                  ::quality quality
                                  ::potion-state ::on-conveyor
                                  ::kind ::potion})))]
@@ -127,11 +129,9 @@
     [:what
      [esse-id ::image/use image-id]
      [esse-id ::esse/vec2-box vec2-box]
+     [esse-id ::esse/rotation rotation]
      [esse-id ::kind ::potion]
      [image-id ::image/metadata metadata]
-     :then
-     (let [previous-y (.-y (cpp/unbox (:* cpp/vec2) vec2-box))]
-       (s-> session (o/insert esse-id {::previous-y previous-y})))
      :then-finally
      (let [all-potions (o/query-all session ::potions-to-render)]
        (s-> session (o/insert :root ::all-potions all-potions)))]
@@ -170,18 +170,35 @@
      (let [vec2           (cpp/unbox (:* cpp/vec2) vec2-box)
            floating-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
            duration       1.0]
-       (s-> session (o/insert esse-id {::potion-state ::considering-to-destroy}))
+       (s-> session (o/insert esse-id {::potion-state ::considering-to-destroy
+                                       ::potion-health 3}))
        (doto (cpp/* floating-anime)
          (cpp/thenRampTo (cpp/vec2 (.-x vec2) 228.0) duration (cpp/choreograph.EaseOutQuint)))
        (let [floating-anime-box (cpp/box floating-anime)]
          (anime/play-episode! esse-id
            (fn [game id dt]
              (let [anime-time (get-in game [esse-id id ::time] 0.0)]
+               (apply-choreo-vec2 floating-anime-box vec2-box anime-time)
                (if (< anime-time duration)
-                 (do (apply-choreo-vec2 floating-anime-box vec2-box anime-time)
-                     (assoc-in game [esse-id id ::time] (+ anime-time dt)))
-                 (-> game
-                     (anime/end-episode esse-id id))))))))]
+                 (assoc-in game [esse-id id ::time] (+ anime-time dt))
+                 (-> game (anime/end-episode esse-id id))))))))]
+
+    ::tapping-to-destroy
+    [:what
+     [:root ::input/mouse-state ::input/idle]
+     [:root ::input/mouse mouse]
+     [:root ::hitbox/esse-id-hit esse-id]
+     [esse-id ::potion-state ::considering-to-destroy]
+     [esse-id ::potion-health potion-health {:then false}]
+     :when (:mouse-down? mouse) (input/mouse-l? mouse)
+     :then
+     (let [new-health (dec potion-health)
+           rand-angle (rand-nth [-10.0 -5.0 5.0 10.0])]
+       (if (> new-health 0)
+         (s-> session (o/insert esse-id {::esse/rotation rand-angle
+                                         ::potion-health new-health}))
+         (s-> session
+              (utils/retract-many esse-id [::potion-state ::potion-health ::image/use ::hitbox/areas ::quality ::kind ::esse/vec2-box]))))]
 
     ::put-back-on-conveyor
     [:what
@@ -190,10 +207,11 @@
      [:root ::hitbox/esse-id-hit esse-id]
      [esse-id ::potion-state ::considering-to-destroy]
      [esse-id ::esse/vec2-box vec2-box]
-     [esse-id ::previous-y previous-y]
+     [esse-id ::original-y previous-y]
      :when (:mouse-down? mouse) (input/mouse-r? mouse)
      :then
-     (s-> session (o/insert esse-id {::potion-state ::putting-it-back}))
+     (s-> session (o/insert esse-id {::esse/rotation 0.0
+                                     ::potion-state ::putting-it-back}))
      (let [vec2            (cpp/unbox (:* cpp/vec2) vec2-box)
            returning-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
            duration        0.2]
@@ -203,9 +221,9 @@
          (anime/play-episode! esse-id
            (fn [game id dt]
              (let [anime-time (get-in game [esse-id id ::time] 0.0)]
+               (apply-choreo-vec2 returning-anime-box vec2-box anime-time)
                (if (< anime-time duration)
-                 (do (apply-choreo-vec2 returning-anime-box vec2-box anime-time)
-                     (assoc-in game [esse-id id ::time] (+ anime-time dt)))
+                 (assoc-in game [esse-id id ::time] (+ anime-time dt))
                  (-> game
                      (world/insert-fact esse-id {::potion-state ::on-conveyor})
                      (anime/end-episode esse-id id))))))))]
@@ -229,10 +247,10 @@
        (let [deposit-anime-box (cpp/box deposit-anime)]
          (anime/play-episode! esse-id
            (fn [game id dt]
-             (let [anime-time (get-in game [esse-id ::time] 0.0)]
+             (let [anime-time (get-in game [esse-id id ::time] 0.0)]
+               (apply-choreo-vec2 deposit-anime-box vec2-box anime-time)
                (if (< anime-time (get-choreo-vec2-duration deposit-anime-box))
-                 (do (apply-choreo-vec2 deposit-anime-box vec2-box anime-time)
-                     (assoc-in game [esse-id ::time] (+ anime-time dt)))
+                 (assoc-in game [esse-id id ::time] (+ anime-time dt))
                  (do (swap! judgement update quality + 1)
                      (-> game
                          (world/retract-many esse-id [::image/use ::hitbox/areas ::quality ::kind ::esse/vec2-box])
@@ -253,13 +271,15 @@
 
 (defn render-this
   [^(:* cpp/SDL_Renderer) sdl-renderer
-   {:keys [image-id vec2-box]}]
+   {:keys [image-id vec2-box rotation]}]
   (when-let [texture-box (get @image/textures-atom image-id)]
     (let [vec2     (cpp/unbox (:* cpp/vec2) vec2-box)
           texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
           src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
           dst-rest (cpp/SDL_FRect (.-x vec2) (.-y vec2) (.-w texture) (.-h texture))]
-      (cpp/SDL_RenderTexture sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest)))))
+      (if rotation
+        (cpp/SDL_RenderTextureRotated sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest) rotation cpp/nullptr cpp/SDL_FLIP_NONE)
+        (cpp/SDL_RenderTexture sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest))))))
 
 (defn render!
   [{sdl-renderer-box :sdl-renderer-box
