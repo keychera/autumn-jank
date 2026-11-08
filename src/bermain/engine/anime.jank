@@ -9,8 +9,9 @@
    anime-fn MUST return game or well you lose the game."
   [esse-id anime-fn]
   (let [id (random-uuid)]
-    (swap! anime-db assoc esse-id {::id id
-                                   ::anime-fn anime-fn})))
+    (swap! anime-db update esse-id
+           (fn [{previous-id ::id}]
+             {::id-to-delete previous-id ::id id ::anime-fn anime-fn}))))
 
 (defn end-episode
   "end-episode of esse-id anime given a game.
@@ -23,11 +24,12 @@
   (let [animes @anime-db
         dt (* delta speed)]
     (reduce-kv
-     (fn [game' esse-id {:keys [::id ::anime-fn]}]
-       (if (= (get-in game' [esse-id id]) ::ending)
-         (do (swap! anime-db dissoc esse-id)
-             (update game' esse-id dissoc id))
-         (anime-fn game' id dt)))
+     (fn [game' esse-id {:keys [::id-to-delete ::id ::anime-fn]}]
+       (cond-> (if (= (get-in game' [esse-id id]) ::ending)
+                 (do (swap! anime-db dissoc esse-id)
+                     (update game' esse-id dissoc id))
+                 (anime-fn game' id dt))
+         id-to-delete (update esse-id dissoc id-to-delete)))
      game animes)))
 
 (defn clean! [_game]
