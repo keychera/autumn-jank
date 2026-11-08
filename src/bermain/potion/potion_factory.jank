@@ -113,7 +113,6 @@
             (o/insert potion-id {::image/use img
                                  ::esse/vec2-box (box-vec2 -100.0 rand-y)
                                  ::esse/rotation 0.0
-                                 ::original-y rand-y
                                  ::quality quality
                                  ::potion-state ::on-conveyor
                                  ::kind ::potion})))]
@@ -170,7 +169,8 @@
      (let [vec2           (cpp/unbox (:* cpp/vec2) vec2-box)
            floating-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
            duration       1.0]
-       (s-> session (o/insert esse-id {::potion-state ::considering-to-destroy
+       (s-> session (o/insert esse-id {::original-y (.-y vec2)
+                                       ::potion-state ::considering-to-destroy
                                        ::potion-health 3}))
        (doto (cpp/* floating-anime)
          (cpp/thenRampTo (cpp/vec2 (.-x vec2) 228.0) duration (cpp/choreograph.EaseOutQuint)))
@@ -210,8 +210,10 @@
      [esse-id ::original-y previous-y]
      :when (:mouse-down? mouse) (input/mouse-r? mouse)
      :then
-     (s-> session (o/insert esse-id {::esse/rotation 0.0
-                                     ::potion-state ::putting-it-back}))
+     (s-> session
+          (o/retract esse-id ::original-y)
+          (o/insert esse-id {::esse/rotation 0.0
+                             ::potion-state ::putting-it-back}))
      (let [vec2            (cpp/unbox (:* cpp/vec2) vec2-box)
            returning-anime (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* vec2))
            duration        0.2]
