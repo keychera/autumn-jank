@@ -8,13 +8,13 @@
    [bermain.esse :refer [box-vec2]]
    [odoyle.rules :as o]))
 
-(defn pos-on-stage
-  [game
+(defn get-camera-box [game]
+  (:camera-vec2-box (world/ask-one game ::camera)))
+
+(defn pos-on-camera
+  [^(:* cpp/vec2) camera-vec2
    ^(:* cpp/vec2) avec2]
-  (let [camera-vec2-box (:camera-vec2-box (world/ask-one game ::camera))
-        camera-vec2     (cpp/unbox (:* cpp/vec2) camera-vec2-box)]
-    [(+ (.-x camera-vec2) (.-x avec2))
-     (+ (.-y camera-vec2) (.-y avec2))]))
+  [(+ (.-x camera-vec2) (.-x avec2)) (+ (.-y camera-vec2) (.-y avec2))])
 
 (def rules
   (o/ruleset

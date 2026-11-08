@@ -262,11 +262,12 @@
       (world/establish rules world-init)))
 
 (defn render-this
-  [{sdl-renderer-box :sdl-renderer-box :as game}
+  [{sdl-renderer-box :sdl-renderer-box}
+   camera
    {:keys [image-id vec2-box rotation]}]
   (when-let [texture-box (get @image/textures-atom image-id)]
     (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-          [x y]    (stage/pos-on-stage game vec2-box)
+          [x y]    (stage/pos-on-camera camera vec2-box)
           texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
           src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
           dst-rest (cpp/SDL_FRect x y (.-w texture) (.-h texture))]
@@ -277,7 +278,8 @@
 (defn render!
   [{text-ui-box ::text/text-ui
     :as game}]
-  (let [potions  (->> (world/ask-many game ::potions-to-render)
+  (let [camera-box (stage/get-camera-box game)
+        potions  (->> (world/ask-many game ::potions-to-render)
                       (sort-by (fn [{vec2-box :vec2-box metadata :metadata}]
                                  (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
                                    (+ (.-y vec2) (:height metadata))))))]
@@ -297,10 +299,10 @@
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
-        (render-this game image)))
+        (render-this game camera-box image)))
 
     (doseq [potion potions]
-      (render-this game potion))))
+      (render-this game camera-box potion))))
 
 (comment
   (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]]
