@@ -29,9 +29,9 @@
   (-> game
       (route-inputs)))
 
-(def ui-OK-x 400.0)
+(def ui-OK-x 480.0)
 (def ui-OK-y 20.0)
-(def ui-NG-dist 180.0)
+(def ui-NG-dist 140.0)
 (defonce judgement (atom {:OK 0 :NG 0}))
 
 (defn default-metadata->areas [{:keys [width height]}]
@@ -70,6 +70,7 @@
                                              [0.0 height-4 width height-3]]))}
               :potion2NG-img {:image-path "res/images/potion2NG.PNG" :areas-fn default-metadata->areas}})
       (insert-facts
+       [:root {:stage/camera-vec2-box (box-vec2 0.0 0.0)}]
        [:count-OK {::image/use :count-OK
                    ::esse/vec2-box (box-vec2 ui-OK-x ui-OK-y)
                    ::layer 0}]
@@ -98,7 +99,31 @@
 
 (def rules
   (o/ruleset
-   {::put-on-conveyor-belt
+   {::stage
+    [:what
+     [:root :stage/camera-vec2-box camera-vec2-box]]
+
+    ::move-camera
+    [:what
+     [:root :stage/camera-action camera-action]
+     [:root :stage/camera-vec2-box camera-vec2-box]
+     :then
+     (let [{:keys [x y duration]} camera-action
+           camera-vec2            (cpp/unbox (:* cpp/vec2) camera-vec2-box)
+           camera-anime           (cpp/new (choreograph.Sequence cpp/vec2) (cpp/* camera-vec2))]
+       (s-> session (o/retract :root :stage/camera-action))
+       (doto (cpp/* camera-anime)
+         (cpp/thenRampTo (cpp/vec2 x y) (float duration) (cpp/choreograph.EaseInOutQuint)))
+       (let [camera-anime-box (cpp/box camera-anime)]
+         (anime/play-episode! :stage/camera
+           (fn [game id dt]
+             (let [anime-time (get-in game [:stage/camera id ::time] 0.0)]
+               (apply-choreo-vec2 camera-anime-box camera-vec2-box anime-time)
+               (if (< anime-time duration)
+                 (assoc-in game [:stage/camera id ::time] (+ anime-time dt))
+                 (-> game (anime/end-episode :stage/camera id))))))))]
+
+    ::put-on-conveyor-belt
     [:what
      [:root ::put-on-conveyor-belt true]
      :then
@@ -273,12 +298,15 @@
 
 (defn render-this
   [^(:* cpp/SDL_Renderer) sdl-renderer
+   ^(:* cpp/vec2) camera
    {:keys [image-id vec2-box rotation]}]
   (when-let [texture-box (get @image/textures-atom image-id)]
     (let [vec2     (cpp/unbox (:* cpp/vec2) vec2-box)
+          x        (+ (.-x vec2) (.-x camera))
+          y        (+ (.-y vec2) (.-y camera))
           texture  (cpp/unbox (:* cpp/SDL_Texture) texture-box)
           src-rect (cpp/SDL_FRect 0.0 0.0 (.-w texture) (.-h texture))
-          dst-rest (cpp/SDL_FRect (.-x vec2) (.-y vec2) (.-w texture) (.-h texture))]
+          dst-rest (cpp/SDL_FRect x y (.-w texture) (.-h texture))]
       (if rotation
         (cpp/SDL_RenderTextureRotated sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest) rotation cpp/nullptr cpp/SDL_FLIP_NONE)
         (cpp/SDL_RenderTexture sdl-renderer texture (cpp/& src-rect) (cpp/& dst-rest))))))
@@ -287,7 +315,7 @@
   [{sdl-renderer-box :sdl-renderer-box
     text-ui-box ::text/text-ui
     :as game}]
-  (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
+  (let [{:keys [camera-vec2-box]} (world/ask-one game ::stage)
         potions  (->> (world/ask-many game ::potions-to-render)
                       (sort-by (fn [{vec2-box :vec2-box metadata :metadata}]
                                  (let [vec2 (cpp/unbox (:* cpp/vec2) vec2-box)]
@@ -308,14 +336,10 @@
 
     (let [images (world/ask-many game ::images-to-render)]
       (doseq [image images]
-        (render-this sdl-renderer-box image)))
+        (render-this sdl-renderer-box camera-vec2-box image)))
 
     (doseq [potion potions]
-      (render-this sdl-renderer-box potion))
-
-    ;; debug
-    (cpp/SDL_SetRenderDrawColor renderer 0 0 0 255)
-    (cpp/SDL_RenderLine renderer deposit-line 0.0 deposit-line 600.0)))
+      (render-this sdl-renderer-box camera-vec2-box potion))))
 
 (comment
   (require '[bermain.engine.game-mutator :refer [inject-facts! assoc-game! debug-tap]]
@@ -330,18 +354,8 @@
     (println fact))
 
   (inject-facts!
-   [:potion1 {::image/use :potion1-img
-              ::esse/vec2-box (box-vec2 30.0 335.0)
-              ::kind ::potion}]
-   [:potion2 {::image/use :potion1NG-img
-              ::esse/vec2-box (box-vec2 130.0 335.0)
-              ::kind ::potion}]
-   [:potion3 {::image/use :potion2-img
-              ::esse/vec2-box (box-vec2 230.0 335.0)
-              ::kind ::potion}]
-   [:potion4 {::image/use :potion2NG-img
-              ::esse/vec2-box (box-vec2 330.0 335.0)
-              ::kind ::potion}])
+   [:root {:stage/camera-action {:x -0.0 :y 0.0
+                                 :duration 1.0}}])
 
   (assoc-game! ::time/speed 0.0)
 
