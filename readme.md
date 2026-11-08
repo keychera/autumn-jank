@@ -1,5 +1,7 @@
 # autumn jank
 
+a game for [Autumn Lisp Game Jam 2026](https://itch.io/jam/autumn-lisp-game-jam-2026/) 
+
 ## build
 
 need jank, babashka
@@ -19,7 +21,7 @@ bb compile
 # run the compiled game
 bb lets play
 
-# AOR compile enabling profiling for Windows Performance Recorder
+# AOT compile enabling profiling for Windows Performance Recorder
 bb compile :profile?
 
 # ship
