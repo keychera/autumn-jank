@@ -163,7 +163,7 @@
   (println "compile-jank with" args)
   (let [jedn (->jank-deps-edn @deps-basis)
         jout (cond-> (-> @deps-basis :jank :compile-out)
-               :profile? (str "---profile"))
+               profile? (str "---profile"))
         jcmd (jank-command jedn "compile" {:main-module (get-main-module @deps-basis)
                                            :extra ["-DPAR_STREAMLINES_IMPLEMENTATION"
                                                    "-DSDL_MAIN_HANDLED"
