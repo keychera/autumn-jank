@@ -73,6 +73,11 @@ open jank.etl with [Profiler Explorer](https://github.com/microsoft/profile-expl
 
 ## exp
 
+woes - rewritten
+1. What I assumed to be the JIT compilation stutter during a running game had me encounter bug that I think can only be found in jank repl. this could be a longer story, a bug that I name, The Delta Bug (commitid: bdc751636b2abfa99b0ab9e79f2887b3ad4265a2, original woes No. 5)
+2. I encountered [bug-1](https://github.com/keychera/bugg-jank/blob/main/src/bermain/bug1.jank): having a binding name the same as a cpp type lead to codegen error. (original woes No. 10)
+3. 
+
 woes
 1. the virus (It Works On My Machine™)
 2. the 3 missing dlls (It Works On My Machine™)
@@ -85,7 +90,8 @@ woes
 7. the mismatch float int type crash during repl (windows woes)
 8. the extra.hpp ld.lld: error: duplicate symbol when AOT compile (lack of c++ knowledge)
     - seems like it's not about static vs inline? the error is from a c header (par_streamlines.h) will investigate further
-9. fail to build inside Steam Linux Runtime 4 (lack of c++ knowledge)
+9. ~~fail to build inside Steam Linux Runtime 4 (lack of c++ knowledge)~~
+  - WE SUCCEED!
 10. naming binding the same name as type, runtime error
 11. libunwind:      pc not in table, pc=0x14D23563F3F (windows woes, ikappakiさん、頑張れ！！ https://github.com/lhames/llvm-project/pull/5 , https://github.com/llvm/llvm-project/issues/163503)
 12. sometimes I need to manually delete target/_cache or it compiles error (maybe lein jank do something about this?)
