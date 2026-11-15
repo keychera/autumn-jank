@@ -4,3 +4,7 @@
 [submodule "third-party/par"]
 	path = third-party/par
 	url = https://github.com/prideout/par
+[submodule "git-deps/odoyle-jank"]
+	path = git-deps/odoyle-jank
+	url = https://github.com/keychera/odoyle-rules
+	branch = odoyle-jank

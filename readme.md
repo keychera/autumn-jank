@@ -4,6 +4,30 @@ a game for [Autumn Lisp Game Jam 2026](https://heritonaru.itch.io/potion-inspect
 
 ![potion inspector](potion.gif)
 
+## setup dev env
+
+in windows
+```sh
+# this will download sdl shared libs from github releases on ../.libs/
+bb prep
+```
+
+in [steamrt4 SDK](https://gitlab.steamos.cloud/steamrt/steamrt4/sdk/-/blob/steamrt/steamrt4/README.md)
+```sh
+distrobox create -i registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk steamrt4
+distrobox enter steamrt4
+
+# or any other methods listed in above doc
+```
+
+## lein-jank
+
+```sh
+lein run
+
+lein with-profile +release compile 
+```
+
 ## build
 
 need jank, babashka
