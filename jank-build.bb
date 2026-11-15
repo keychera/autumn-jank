@@ -3,6 +3,7 @@
  '[jank.build.pkg-config :refer [pkg-config]])
 
 (util/define "PAR_STREAMLINES_IMPLEMENTATION")
+(util/define "SDL_MAIN_HANDLED")
 
 (cond
   (util/windows?)

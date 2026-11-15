@@ -10,6 +10,7 @@
         "starting game!")))
 
 (defn dev []
+  (println "starting jank-game-dev!")
   (while true
     (try
       (when @start-atom

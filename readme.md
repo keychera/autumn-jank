@@ -23,9 +23,9 @@ distrobox enter steamrt4
 ## lein-jank
 
 ```sh
-lein run
+lein repl
 
-lein with-profile +release compile 
+lein with-profile +release compile
 ```
 
 ## build
