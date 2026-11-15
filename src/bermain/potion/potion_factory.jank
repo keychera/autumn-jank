@@ -1,8 +1,9 @@
 (ns bermain.potion.potion-factory
   (:include
+   "extra.hpp"
+   "resources.hpp"
    "SDL3/SDL.h"
    "SDL3_ttf/SDL_ttf.h"
-   "extra.hpp"
    "choreograph/Choreograph.h"
    "choreograph/Easing.h")
   (:require
@@ -17,6 +18,7 @@
    [bermain.engine.world :as world]
    [bermain.esse :as esse :refer [box-vec2]]
    [bermain.sdl3.image :as image]
+   [bermain.sdl3.resources :refer [io-from-const-mem]]
    [bermain.sdl3.sdl3-input :as sdl3-input]
    [bermain.sdl3.text :as text]
    [bermain.sdl3.time :as time]
@@ -175,7 +177,7 @@
      [esse-id ::potion-state ::considering-to-destroy]
      :when (:mouse-down? mouse) (input/mouse-r? mouse)
      :then
-     (s-> session 
+     (s-> session
           (o/insert :root {::story ::next})
           (o/insert esse-id {::potion-state ::putting-it-back}))]
 
@@ -268,35 +270,37 @@
 (defn world-init [world _game]
   (reset! judgement {:OK 0 :NG 0 ::story 0})
   (-> (reduce-kv
-       (fn [world image-id {:keys [image-path areas-fn]}]
-         (o/insert world image-id (cond-> {::image/image-path image-path}
+       (fn [world image-id {:keys [image-stream areas-fn]}]
+         (o/insert world image-id (cond-> {::image/image-stream image-stream}
                                     areas-fn (assoc ::areas-fn areas-fn))))
-       world {:count-OK {:image-path "res/images/countOK.PNG"}
-              :count-NG {:image-path "res/images/countNG.PNG"}
-              :carmine-img {:image-path "res/images/carmine.PNG"}
-              :conveyor-img {:image-path "res/images/conveyor.PNG"}
-              :potion1-img {:image-path "res/images/potion1.PNG"
-                            :areas-fn (fn [{:keys [width height]}]
-                                        (let [width    (float width)
-                                              height-1 (float (/ height 1.8))
-                                              height-2 (- height height-1)
-                                              height-3 (/ height-2 2)
-                                              height-4 (+ height-1 height-3)]
-                                          [[30.0 0.0 30.0 height-1]
-                                           [20.0 height-1 60.0 height-3]
-                                           [0.0 height-4 width height-3]]))}
-              :potion2-img {:image-path "res/images/potion2.PNG" :areas-fn default-metadata->areas}
-              :potion1NG-img {:image-path "res/images/potion1NG.PNG"
-                              :areas-fn (fn [{:keys [width height]}]
-                                          (let [width    (float width)
-                                                height-1 (float (/ height 2.5))
-                                                height-2 (- height height-1)
-                                                height-3 (/ height-2 2)
-                                                height-4 (+ height-1 height-3)]
-                                            [[30.0 0.0 30.0 height-1]
-                                             [20.0 height-1 60.0 height-3]
-                                             [0.0 height-4 width height-3]]))}
-              :potion2NG-img {:image-path "res/images/potion2NG.PNG" :areas-fn default-metadata->areas}})
+       world {:count-OK      {:image-stream (io-from-const-mem cpp/res.countOK_data)}
+              :count-NG      {:image-stream (io-from-const-mem cpp/res.countNG_data)}
+              :carmine-img   {:image-stream (io-from-const-mem cpp/res.carmine_data)}
+              :conveyor-img  {:image-stream (io-from-const-mem cpp/res.conveyor_data)}
+              :potion1-img   {:image-stream (io-from-const-mem cpp/res.potion1_data)
+                              :areas-fn   (fn [{:keys [width height]}]
+                                            (let [width    (float width)
+                                                  height-1 (float (/ height 1.8))
+                                                  height-2 (- height height-1)
+                                                  height-3 (/ height-2 2)
+                                                  height-4 (+ height-1 height-3)]
+                                              [[30.0 0.0 30.0 height-1]
+                                               [20.0 height-1 60.0 height-3]
+                                               [0.0 height-4 width height-3]]))}
+              :potion2-img   {:image-stream (io-from-const-mem cpp/res.potion2_data)
+                              :areas-fn   default-metadata->areas}
+              :potion1NG-img {:image-stream (io-from-const-mem cpp/res.potion1NG_data)
+                              :areas-fn   (fn [{:keys [width height]}]
+                                            (let [width    (float width)
+                                                  height-1 (float (/ height 2.5))
+                                                  height-2 (- height height-1)
+                                                  height-3 (/ height-2 2)
+                                                  height-4 (+ height-1 height-3)]
+                                              [[30.0 0.0 30.0 height-1]
+                                               [20.0 height-1 60.0 height-3]
+                                               [0.0 height-4 width height-3]]))}
+              :potion2NG-img {:image-stream (io-from-const-mem cpp/res.potion2NG_data)
+                              :areas-fn   default-metadata->areas}})
       (insert-facts
        [:root {::dialogue/tick-length 0.02
                ::dialogue/dialogue ""

@@ -1,9 +1,9 @@
 (ns bermain.sdl3.audio
   (:include
+   "resources.hpp"
    "SDL3_mixer/SDL_mixer.h")
   (:require
    [bermain.engine.fact-queue :refer [queue-new-fact!]]
-   [bermain.engine.utils :refer [s->]]
    [bermain.engine.world :as world]
    [bermain.sdl3.error :refer [must-be-some must-be-true]]
    [bermain.sdl3.time :as time]
@@ -29,14 +29,13 @@
    {::load-audio
     [:what
      [:root ::mixer-box mixer-box]
-     [esse-id ::audio-path audio-path]
      :then
      (future
-       (let [mixer (cpp/unbox (:* cpp/MIX_Mixer) mixer-box)
-             audio (must-be-some (cpp/MIX_LoadAudio mixer audio-path true))]
-         (swap! audio-atom assoc esse-id {:audio (cpp/box audio)})
-         (queue-new-fact! [esse-id ::loaded? true])))
-     (s-> session (o/retract esse-id ::audio-path))]
+       (let [mixer    (cpp/unbox (:* cpp/MIX_Mixer) mixer-box)
+             bgm-data (must-be-some (cpp/SDL_IOFromConstMem cpp/res.bgm_data cpp/res.bgm_data_size))
+             audio    (must-be-some (cpp/MIX_LoadAudio_IO mixer bgm-data false true))]
+         (swap! audio-atom assoc :bgm-a {:audio (cpp/box audio)})
+         (queue-new-fact! [:bgm-a ::loaded? true])))]
 
     ::play-bgm
     [:what
@@ -59,14 +58,14 @@
 (defn world-init [world {:keys [::mixer-box]}]
   (-> world
       (o/insert :root ::mixer-box mixer-box)
-      (o/insert :bgm-a {::audio-path "res/pixelspheremegamix.ogg"
-                        ::bgm? true})))
+      (o/insert :bgm-a {::bgm? true})))
 
 (defn init [game]
   (must-be-true (cpp/MIX_Init))
 
   (let [mixer (must-be-some (cpp/MIX_CreateMixerDevice cpp/SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK cpp/nullptr))
-        dialogue-sfx   (cpp/box (must-be-some (cpp/MIX_LoadAudio mixer "res/click2.ogg" true)))
+        click2-const   (must-be-some (cpp/SDL_IOFromConstMem cpp/res.click2_ogg_data cpp/res.click2_ogg_data_size))
+        dialogue-sfx   (cpp/box (must-be-some (cpp/MIX_LoadAudio_IO mixer click2-const false true)))
         sfx-track-pool (letfn [(create-dialogue-sfx-track []
                                  (let [sfx-track (cpp/box (must-be-some (cpp/MIX_CreateTrack mixer)))]
                                    (set-track sfx-track dialogue-sfx)

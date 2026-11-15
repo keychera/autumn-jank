@@ -1,0 +1,10 @@
+(ns bermain.sdl3.resources
+  (:include
+   "SDL3/SDL.h"
+   "resources.hpp")
+  (:require [bermain.sdl3.error :refer [must-be-some]]))
+
+(defmacro io-from-const-mem [data]
+  ;; assumes both {data} and {data}_size defined in resources.hpp
+  (let [size (symbol (str data "_size"))]
+    `(cpp/box (must-be-some (cpp/SDL_IOFromConstMem ~data ~size)))))

@@ -19,17 +19,18 @@
    {::load-image
     [:what
      [:root ::sdl3/renderer-box sdl-renderer-box]
-     [esse-id ::image-path image-path]
+     [esse-id ::image-stream image-stream]
      :then
      (let [previous-texture (get @textures-atom esse-id)]
        (when previous-texture
          (destroy-texture previous-texture))
        (let [renderer (cpp/unbox (:* cpp/SDL_Renderer) sdl-renderer-box)
-             texture  (doto (must-be-some (cpp/IMG_LoadTexture renderer image-path))
+             stream   (cpp/unbox (:* cpp/SDL_IOStream) image-stream)
+             texture  (doto (must-be-some (cpp/IMG_LoadTextureTyped_IO renderer stream true "PNG"))
                         (cpp/SDL_SetTextureScaleMode cpp/SDL_SCALEMODE_NEAREST))]
          (swap! textures-atom assoc esse-id (cpp/box texture))
          (s-> session
-              (o/retract esse-id ::image-path)
+              (o/retract esse-id ::image-stream)
               (o/insert esse-id {::metadata {:width (.-w texture) :height (.-h texture)}}))))]}))
 
 (defn init [game]
