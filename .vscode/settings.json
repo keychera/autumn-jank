@@ -5,6 +5,7 @@
             "projectType": "generic",
             "cljsType": "none",
             "autoSelectForConnect": true,
+            "projectRootPath": ["."],
             "nReplPortFile": [
                 ".nrepl-port"
             ]

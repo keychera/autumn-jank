@@ -1,8 +1,8 @@
-[submodule "third-party/choreograph"]
-	path = third-party/choreograph
+[submodule "git-deps/choreograph"]
+	path = git-deps/choreograph
 	url = https://github.com/mardy/Choreograph
-[submodule "third-party/par"]
-	path = third-party/par
+[submodule "git-deps/par"]
+	path = git-deps/par
 	url = https://github.com/prideout/par
 [submodule "git-deps/odoyle-jank"]
 	path = git-deps/odoyle-jank

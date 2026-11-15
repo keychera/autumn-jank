@@ -4,10 +4,12 @@
   :main bermain.game 
   :source-paths ["src" "git-deps/odoyle-jank/src"] 
   :jank {:include-dirs ["src-cpp" 
-                        "third-party/choreograph/src"
-                        "third-party/par"]}
+                        "git-deps/choreograph/src"
+                        "git-deps/par"]}
   :build-dependencies [[org.jank-lang.commons/jank-build "2026.10-1"]]
-  :profiles {:base    {:jank {:target-dir         "target/debug"
+  :profiles {:base    {:source-paths ["src-dev"]
+                       :main bermain.dev
+                       :jank {:target-dir         "target/debug"
                               :optimization-level 0}}
              :release {:jank {:target-dir         "target/release"
                               :optimization-level 3}}})
