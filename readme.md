@@ -10,6 +10,9 @@ in windows
 ```sh
 # this will download sdl shared libs from github releases on ../.libs/
 bb prep
+
+# prepping submodule minimally
+bb lets prep-submodules
 ```
 
 in [steamrt4 SDK](https://gitlab.steamos.cloud/steamrt/steamrt4/sdk/-/blob/steamrt/steamrt4/README.md)
@@ -23,8 +26,10 @@ distrobox enter steamrt4
 ## lein-jank
 
 ```sh
+# repl dev
 lein repl
 
+# aot compile
 lein with-profile +release compile
 ```
 
@@ -127,3 +132,40 @@ woes
       ([^(:* cpp/MIX_Track) track props]
       (cpp/MIX_PlayTrack track props)))
     ```
+
+## building jank in steamrt4
+
+```sh
+distrobox create -i registry.gitlab.steamos.cloud/steamrt/steamrt4/sdk steamrt4
+distrobox enter steamrt4
+
+# (note that libstdc++-16-dev is not installed here. seems like l,ibstdc++ in this linux is compatible so far)
+sudo apt-get install -y curl git git-lfs build-essential entr libssl-dev libdouble-conversion-dev pkg-config ninja-build cmake zlib1g-dev libffi-dev libbz2-dev gcc g++ libboost-all-dev
+
+# build clang/llvm
+cd compiler+runtime
+mkdir -p build
+export CC=clang; export CXX=clang++;
+./bin/build-clang
+export CC=$PWD/build/llvm-install/usr/local/bin/clang; export CXX=$PWD/build/llvm-install/usr/local/bin/clang++
+
+# build jank
+git submodule update --init --recursive --jobs 8
+./bin/configure -GNinja -DCMAKE_BUILD_TYPE=Release -Djank_local_clang=on
+./bin/compile
+```
+
+
+# vendor deps
+
+only needed once when setting up the repo
+
+```sh
+git submodule add -b odoyle-jank https://github.com/keychera/odoyle-rules git-deps/odoyle-jank
+( git submodule add https://github.com/libsdl-org/SDL git-deps/sdl3; cd git-deps/sdl3; git reset --hard "release-3.4.20")
+git submodule add https://github.com/libsdl-org/SDL_image git-deps/sdl3-image
+git submodule add https://github.com/libsdl-org/SDL_mixer git-deps/sdl3-mixer
+git submodule add https://github.com/libsdl-org/SDL_ttf git-deps/sdl3-ttf
+
+bb lets prep-submodules
+```

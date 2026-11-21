@@ -2,6 +2,7 @@
   (:require
    [babashka.fs :as fs]
    [babashka.http-client :as http]
+   [babashka.process :as proc]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
@@ -114,6 +115,37 @@
              (str to-here "/" (str/replace-first (:dll-file sdl-dep) #"bin/" "")) {:replace-existing true}))
   (doseq [file (fs/glob (str dot-libs "/missing-pieces") "*.dll")]
     (fs/copy file to-here {:replace-existing true})))
+
+(defn log-shell [& args]
+  (println args)
+  (apply proc/shell args))
+
+(defn init-submodule-tree
+  "this accept either a string or a vector [string [children1 children2 ...]] "
+  [dir submodule-pattern]
+  (cond
+    (string? submodule-pattern)
+    (log-shell {:dir dir} "git" "submodule" "update" "--init" "--depth" 1 submodule-pattern)
+
+    (and (vector? submodule-pattern) (= (count submodule-pattern) 2))
+    (let [[submodule children] submodule-pattern]
+      (init-submodule-tree dir submodule)
+      (doseq [child children]
+        (init-submodule-tree submodule child)))))
+
+(defn prep-submodules [{}]
+  (let [submodule-to-init
+        ["git-deps/choreograph"
+         "git-deps/odoyle-jank"
+         "git-deps/par"
+         "git-deps/sdl3"
+         "git-deps/sdl3-image"
+         "git-deps/sdl3-mixer"
+         ["git-deps/sdl3-ttf"
+          ["external/freetype"
+           "external/harfbuzz"]]]]
+    (doseq [submodule submodule-to-init]
+      (init-submodule-tree "." submodule))))
 
 (defn prep [args]
   (prep-kondo args)

@@ -8,3 +8,15 @@
 	path = git-deps/odoyle-jank
 	url = https://github.com/keychera/odoyle-rules
 	branch = odoyle-jank
+[submodule "git-deps/sdl3"]
+	path = git-deps/sdl3
+	url = https://github.com/libsdl-org/SDL
+[submodule "git-deps/sdl3-image"]
+	path = git-deps/sdl3-image
+	url = https://github.com/libsdl-org/SDL_image
+[submodule "git-deps/sdl3-mixer"]
+	path = git-deps/sdl3-mixer
+	url = https://github.com/libsdl-org/SDL_mixer
+[submodule "git-deps/sdl3-ttf"]
+	path = git-deps/sdl3-ttf
+	url = https://github.com/libsdl-org/SDL_ttf
