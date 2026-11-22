@@ -29,7 +29,8 @@ distrobox enter steamrt4
 # repl dev
 lein repl
 
-# aot compile
+# aot compile (extra flags for Windows only)
+export JANK_EXTRA_FLAGS="-Wl,-subsystem,windows"
 lein with-profile +release compile
 ```
 
