@@ -1,5 +1,6 @@
 (require
  '[babashka.process :as proc]
+ '[clojure.string :as str]
  '[jank.build.util :as util]
  '[jank.build.cmake :refer [cmake]]
  '[jank.build.pkg-config :refer [parse-prefixed pkg-config has-static-lib?]])
@@ -102,22 +103,27 @@
 
 (cond
   (util/windows?)
-  #_(let [assume-share-lib-location "../.libs"
-          project-dir               (:src-dir *input*)]
-      (doseq [[lib-name lib-dir]
-              [["SDL3" "SDL3-3.4.2/x86_64-w64-mingw32"]
-               ["SDL3_image" "SDL3_image-3.4.0/x86_64-w64-mingw32"]
-               ["SDL3_mixer" "SDL3_mixer-3.2.4/x86_64-w64-mingw32"]
-               ["SDL3_ttf" "SDL3_ttf-3.2.2/x86_64-w64-mingw32"]]]
-        (util/include-dir (str project-dir "/" assume-share-lib-location "/" lib-dir "/include"))
-        (util/link-dir (str project-dir "/" assume-share-lib-location "/" lib-dir "/bin"))
-        (util/link-library lib-name)))
-  (do
-    (sdl-static)
-    (pkg-config-from-build *input* "sdl3")
-    (pkg-config-from-build *input* "sdl3-image")
-    (pkg-config-from-build *input* "sdl3-mixer")
-    (pkg-config-from-build *input* "sdl3-ttf"))
+  (if (:static? *input*)
+    (let [sdl-install  (str (:src-dir *input*) "/.qqq/sdl-static")
+          static-input {:out-dir sdl-install
+                        :static? true}]
+      (util/include-dir (str sdl-install "/include"))
+      (util/link-dir (str sdl-install "/lib"))
+      (pkg-config-from-build static-input "sdl3-image")
+      (pkg-config-from-build static-input "sdl3-mixer")
+      (pkg-config-from-build static-input "sdl3-ttf")
+      (pkg-config-from-build static-input "sdl3"))
+    (let [sdl-install (str (:src-dir *input*) "/../.libs")]
+      (util/include-dir (str sdl-install "/include"))
+      (util/link-dir (str sdl-install "/bin"))
+      (doseq [sdl-lib ["SDL3" "SDL3_image" "SDL3_ttf" "SDL3_mixer"]]
+        (util/link-library sdl-lib))))
+  #_(do ;; to rebuild static libs
+      (sdl-static)
+      (pkg-config-from-build *input* "sdl3-image")
+      (pkg-config-from-build *input* "sdl3-mixer")
+      (pkg-config-from-build *input* "sdl3-ttf")
+      (pkg-config-from-build *input* "sdl3"))
 
   (util/linux?)
   ;; assume using distrobox

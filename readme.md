@@ -133,6 +133,32 @@ woes
       ([^(:* cpp/MIX_Track) track props]
       (cpp/MIX_PlayTrack track props)))
     ```
+16. The Linker (tm)
+```clojure
+(doseq [sdl-lib ["SDL3_image" "SDL3_ttf" "SDL3_mixer" "SDL3"]]
+  (util/link-library sdl-lib))
+
+;; JIT session error: Symbols not found: [ MIX_CreateMixerDevice, MIX_LoadAudio_IO, MIX_Init, MIX_CreateTrack ]
+;; error!
+
+(doseq [sdl-lib ["SDL3" "SDL3_image" "SDL3_ttf" "SDL3_mixer"]]
+  (util/link-library sdl-lib))
+
+;; works! but why?
+```
+
+I thought this would employ similar logic to cmake,
+or rather, the [comment](https://github.com/Ravbug/sdl3-sample/blob/main/CMakeLists.txt#L96-L102) from raybug sdl sample
+
+```sh
+# Link SDL to our executable. This also makes its include directory available to us. 
+target_link_libraries(${EXECUTABLE_NAME} PUBLIC 
+  SDL3_ttf::SDL3_ttf      # remove if you are not using SDL_ttf
+  SDL3_mixer::SDL3_mixer  # remove if you are not using SDL_mixer
+  SDL3_image::SDL3_image	# remove if you are not using SDL_image
+  SDL3::SDL3              # If using satelite libraries, SDL must be the last item in the list. 
+)
+```
 
 ## building jank in steamrt4
 

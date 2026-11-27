@@ -7,9 +7,11 @@
                         "git-deps/par"]}
   :build-dependencies [[org.jank-lang.commons/jank-build "2026.10-1"]]
   :profiles {:base    {:source-paths ["src-dev"]
-                       :main bermain.dev
-                       :jank {:target-dir         "target/debug"
-                              :optimization-level 0}}
+                       :main         bermain.dev
+                       :jank         {:target-dir         "target/debug"
+                                      :optimization-level 0
+                                      :static?            false}}
              :release {:jank {:target-dir         "target/release"
-                              :optimization-level 3}
+                              :optimization-level 3
+                              :static?            true}
                        :main bermain.game}})
